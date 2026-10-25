@@ -5,8 +5,8 @@ const API = 'https://api.github.com';
 const API_VERSION = '2022-11-28';
 export interface GithubRepository extends RepositoryRef { id: number; }
 interface GithubFile { sha: string; content: string; encoding: string; }
-export interface FileWriteExpectation { ownedSha?: string; allowPendingContentSha?: string; targetExpectedAbsent: boolean; }
-export interface FileWritePlan { repo: RepositoryRef; path: string; content: string; sha?: string; contentSha: string; noop: boolean; }
+export interface FileWriteExpectation { ownedSha?: string; allowPendingContentSha?: string; adoptExactMatch?: boolean; targetExpectedAbsent: boolean; }
+export interface FileWritePlan { repo: RepositoryRef; path: string; content: string; sha?: string; contentSha: string; noop: boolean; matchedExistingContent?: boolean; }
 export class FileOwnershipError extends Error { constructor(message: string) { super(message); this.name = 'FileOwnershipError'; } }
 
 export class GithubClient {
@@ -63,6 +63,11 @@ export class GithubClient {
       return { repo, path, content, contentSha, noop: false };
     }
     if (expectation.allowPendingContentSha === contentSha && existing.sha === contentSha) return { repo, path, content, sha: existing.sha, contentSha, noop: true };
+    // A fresh browser profile has no local ownership ledger from another browser.
+    // During sync only, an exact Git blob hash match to the full generated content
+    // is safe to recognize without writing the existing file. The caller persists
+    // a durable local ownership record before later updates/deletes can rely on it.
+    if (expectation.adoptExactMatch && existing.sha === contentSha) return { repo, path, content, sha: existing.sha, contentSha, noop: true, matchedExistingContent: true };
     if (!expectation.ownedSha || existing.sha !== expectation.ownedSha) {
       throw new FileOwnershipError(`Destination path is occupied by an unowned or changed file: ${path}. Move or rename that file, then retry.`);
     }

@@ -1,3 +1,4 @@
+import { browserApi } from '../platform/browser';
 import { useCallback, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { DEFAULT_SYNC_FILTERS, type Settings, type SyncFilters, type SyncHistoryEntry, type SyncHistoryStatus, type VaultStatus } from '../domain/types';
@@ -8,7 +9,7 @@ type DashboardState = Settings & { vault: VaultStatus };
 type QueryDraft = { search: string; status: SyncHistoryStatus | 'all'; language: string; fromDate: string; toDate: string };
 type Message = Record<string, unknown> & { type: string };
 async function send<T>(message: Message): Promise<T> {
-  const response = await chrome.runtime.sendMessage(message) as { ok: boolean; value?: T; error?: string };
+  const response = await browserApi().runtime.sendMessage(message) as { ok: boolean; value?: T; error?: string };
   if (!response?.ok) throw new Error(response?.error || 'The extension background worker did not respond.');
   return response.value as T;
 }

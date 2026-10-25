@@ -1,3 +1,4 @@
+import { browserApi } from '../platform/browser';
 import type { CfSubmission, CodeforcesCredentials } from '../domain/types';
 
 export class ApiError extends Error {
@@ -52,10 +53,10 @@ export async function rateLimitedCfJson<T>(url: string, fetcher: typeof fetch = 
   cfQueue = new Promise<void>((resolve) => { unlock = resolve; });
   await previousQueued;
   try {
-    const previous = Number((await chrome.storage.local.get(CF_LAST_CALL_KEY))[CF_LAST_CALL_KEY] || 0);
+    const previous = Number((await browserApi().storage.local.get(CF_LAST_CALL_KEY))[CF_LAST_CALL_KEY] || 0);
     const remaining = 2100 - (Date.now() - previous);
     if (remaining > 0) await new Promise((resolve) => setTimeout(resolve, remaining));
-    await chrome.storage.local.set({ [CF_LAST_CALL_KEY]: Date.now() });
+    await browserApi().storage.local.set({ [CF_LAST_CALL_KEY]: Date.now() });
     return await requestJson<T>(url, undefined, fetcher);
   } finally { unlock(); }
 }

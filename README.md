@@ -29,12 +29,20 @@ Import your Accepted Codeforces solutions into a GitHub repository, then keep th
 
 That’s it. The extension checks for newer Accepted submissions automatically. Keep the extracted folder where it is. To update, download and extract the newer ZIP over that folder, then click **Reload** on the browser’s extensions page. Updates are manual. Do not remove the extension to update; that can erase its local vault and history.
 
+### Browser availability
+
+- **Chrome and Brave:** use the GitHub Release ZIP and the unpacked-install steps above.
+- **Microsoft Edge:** the Edge Add-ons submission is in review. The Edge store package has its own store-assigned extension identity; use the store listing once it is approved and published.
+- **Firefox:** the Firefox AMO submission is awaiting review. Install from the AMO listing once it is approved and published.
+
+Edge and Firefox use browser-specific builds. Each browser profile keeps its own vault and sync history; history is not automatically shared between browsers. See the [browser store submission guide](docs/STORE_SUBMISSION.md) for maintainer build and submission details.
+
 ## What it does
 
 - Saves solutions under `Codeforces/<contest>/<problem>_<name>.<extension>`.
 - Shows sync history and lets you filter which submissions sync. Filters are off by default.
-- Protects unrelated or changed GitHub files: it reports a collision instead of overwriting a file it cannot verify as its own.
-- Encrypts credentials in a local vault. History and ownership records stay in your browser profile and are not shared between devices. No GitHub Personal Access Token is used.
+- Protects unrelated or changed GitHub files: when a new browser profile imports history, it recognizes an existing solution only if its full Git blob SHA matches the exact generated Codeforces solution. It leaves that file untouched and records the verified ownership locally; files that merely occupy the same path or have different content still need resolution.
+- Encrypts credentials in a local vault. History and ownership records are stored in each browser profile, not automatically shared between browsers or devices. To populate history in another browser, connect the same accounts and repository there, then run **Re-import history**; exact matching solutions are recognized without duplicate GitHub writes. No GitHub Personal Access Token is used.
 
 Codeforces may not return source for every submission. If it does not, that submission is reported and older code is not substituted. Because Codeforces uses offset-based history pages, run **Re-import history** after submissions have settled if you need to reconcile a large import.
 
@@ -42,7 +50,7 @@ Codeforces may not return source for every submission. If it does not, that subm
 
 - **“GitHub sign-in is not configured in this build.”** Use the production ZIP from Releases, not a development or test build. The published v0.2.0 ZIP includes production sign-in settings. If you still see this in that release, contact support with your extension version and browser. Do not edit configuration files or send secrets.
 - **“Could not reach the sign-in service.”** Check your internet connection and retry.
-- **A destination collision is reported.** Move or rename the conflicting file in GitHub, then retry. The extension will not adopt or overwrite it automatically.
+- **A destination collision is reported.** The existing file differs from the exact solution being imported or its ownership cannot be verified. Review the file in GitHub before moving/renaming it and retrying; the extension will not overwrite changed or unrelated content.
 - **The vault is locked after restarting the browser.** Unlock it with your vault passphrase. If you forget it, reset the vault and reconnect; the encrypted credentials cannot be recovered without the passphrase.
 - **An import stopped.** Reopen the extension, unlock the vault, and let it resume from its saved checkpoint.
 

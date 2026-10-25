@@ -1,3 +1,4 @@
+import { browserApi } from '../platform/browser';
 import { DEFAULT_SETTINGS, type RepositoryRef, type SyncFilters, type SyncHistoryStatus } from '../domain/types';
 import { normalizeSyncFilters } from '../domain/filters';
 import { fetchCodeforcesProfile, fetchSubmissionPage, submissionSource } from '../services/codeforces';
@@ -45,20 +46,20 @@ async function dispatch(message: Command): Promise<unknown> {
       const fresh = await getSettings();
       await schedulePeriodicAlarm(fresh);
       if (fresh.consentAcceptedAt && fresh.codeforcesHandle && fresh.githubLogin && fresh.repository && (fresh.sync.phase === 'historical' || fresh.sync.phase === 'incremental' || fresh.autoSync)) {
-        await chrome.alarms.create(UNLOCKED_ALARM, { delayInMinutes: 0.1 });
+        await browserApi().alarms.create(UNLOCKED_ALARM, { delayInMinutes: 0.1 });
       }
       return getSettings();
     }
     case 'vaultLock':
       await cancelSyncJob('paused');
-      await lockVault(); await chrome.alarms.clear(UNLOCKED_ALARM); await chrome.alarms.clear(RECOVERY_ALARM);
+      await lockVault(); await browserApi().alarms.clear(UNLOCKED_ALARM); await browserApi().alarms.clear(RECOVERY_ALARM);
       await schedulePeriodicAlarm(); return getSettings();
     case 'vaultReset':
       if (settings.repository) await backfillLegacyHistory(settings.repository.fullName, settings.sync, settings.sync.lastRunAt);
       if (settings.repository && settings.codeforcesHandle) await backfillDurableOwnership(settings.repository.fullName, settings.codeforcesHandle, settings.sync);
       await cancelSyncJob('idle', true);
       await resetVault();
-      await chrome.alarms.clear(UNLOCKED_ALARM); await chrome.alarms.clear(RECOVERY_ALARM);
+      await browserApi().alarms.clear(UNLOCKED_ALARM); await browserApi().alarms.clear(RECOVERY_ALARM);
       await updateSettings((current) => ({ ...current, codeforcesHandle: undefined, codeforcesSourceAccess: undefined, githubLogin: undefined, repository: undefined, sync: { ...DEFAULT_SETTINGS.sync } }));
       await schedulePeriodicAlarm(); return getSettings();
     case 'consent':
@@ -119,7 +120,7 @@ async function dispatch(message: Command): Promise<unknown> {
       if (settings.repository) await backfillLegacyHistory(settings.repository.fullName, settings.sync, settings.sync.lastRunAt);
       if (settings.repository && settings.codeforcesHandle) await backfillDurableOwnership(settings.repository.fullName, settings.codeforcesHandle, settings.sync);
       await cancelSyncJob('idle', true);
-      await chrome.alarms.clear(RECOVERY_ALARM); await chrome.alarms.clear(UNLOCKED_ALARM);
+      await browserApi().alarms.clear(RECOVERY_ALARM); await browserApi().alarms.clear(UNLOCKED_ALARM);
       const restored = settings.codeforcesHandle ? await getDurableOwnership(message.repository.fullName, settings.codeforcesHandle) : {};
       const sync = { ...DEFAULT_SETTINGS.sync, repositoryFullName: message.repository.fullName, synced: restored, uniqueProblems: Object.keys(restored).length, filesUploaded: Object.keys(restored).length };
       const updated = await updateSettings((current) => ({ ...current, repository: message.repository, sync }));
@@ -137,7 +138,7 @@ async function dispatch(message: Command): Promise<unknown> {
       await updateSettings((current) => ({ ...current, sync: { ...current.sync, phase: 'historical', nextFrom: 1, submissionsSeen: 0, acceptedSeen: 0, scanCutoff: undefined, done: false, failed: {}, error: undefined } }));
       await runSync('historical'); return getSettings();
     case 'pause':
-      await cancelSyncJob('paused'); await chrome.alarms.clear(PERIODIC_ALARM); await chrome.alarms.clear(RECOVERY_ALARM); await chrome.alarms.clear(UNLOCKED_ALARM); return getSettings();
+      await cancelSyncJob('paused'); await browserApi().alarms.clear(PERIODIC_ALARM); await browserApi().alarms.clear(RECOVERY_ALARM); await browserApi().alarms.clear(UNLOCKED_ALARM); return getSettings();
     case 'resume':
       if (!settings.consentAcceptedAt) throw new Error('Review and accept the data use notice before syncing.');
       await updateSettings((current) => ({ ...current, sync: { ...current.sync, phase: 'idle', error: undefined } }));
@@ -151,7 +152,7 @@ async function dispatch(message: Command): Promise<unknown> {
       if (settings.repository) await backfillLegacyHistory(settings.repository.fullName, settings.sync, settings.sync.lastRunAt);
       if (settings.repository && settings.codeforcesHandle) await backfillDurableOwnership(settings.repository.fullName, settings.codeforcesHandle, settings.sync);
       await cancelSyncJob('idle', true);
-      await chrome.alarms.clear(RECOVERY_ALARM); await chrome.alarms.clear(UNLOCKED_ALARM);
+      await browserApi().alarms.clear(RECOVERY_ALARM); await browserApi().alarms.clear(UNLOCKED_ALARM);
       await updateVaultSecrets((current) => message.provider === 'github'
         ? { ...current, github: undefined, githubRefreshPending: false }
         : { ...current, codeforcesCredentials: undefined });
@@ -162,25 +163,25 @@ async function dispatch(message: Command): Promise<unknown> {
   }
 }
 
-chrome.runtime.onMessage.addListener((message: Command, _sender, sendResponse) => {
+browserApi().runtime.onMessage.addListener((message: Command, _sender, sendResponse) => {
   dispatch(message).then((value) => sendResponse({ ok: true, value })).catch((error: unknown) => sendResponse({ ok: false, error: error instanceof Error ? error.message : 'Unexpected error.' }));
   return true;
 });
 
 function validHistoryStatus(status: unknown): status is SyncHistoryStatus | 'all' { return status === 'all' || status === 'uploaded' || status === 'updated' || status === 'skipped' || status === 'failed'; }
 
-chrome.alarms.onAlarm.addListener((alarm) => {
+browserApi().alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === PERIODIC_ALARM) void runSync('incremental').catch(() => undefined);
   if (alarm.name === UNLOCKED_ALARM) void getSettings().then((settings) => runSync(settings.sync.done ? 'incremental' : 'historical', settings.sync.phase === 'paused')).catch(() => undefined);
   if (alarm.name === RECOVERY_ALARM) void getSettings().then((settings) => {
     if (settings.sync.phase === 'historical' || settings.sync.phase === 'incremental') void runSync(settings.sync.done ? 'incremental' : 'historical').catch(() => undefined);
   });
 });
-chrome.runtime.onInstalled.addListener(() => { void schedulePeriodicAlarm(); });
-chrome.runtime.onStartup.addListener(() => { void getSettings().then(async (current) => { await schedulePeriodicAlarm(current); if (current.sync.phase === 'historical' || current.sync.phase === 'incremental') await runSync(current.sync.done ? 'incremental' : 'historical').catch(() => undefined); }); });
+browserApi().runtime.onInstalled.addListener(() => { void schedulePeriodicAlarm(); });
+browserApi().runtime.onStartup.addListener(() => { void getSettings().then(async (current) => { await schedulePeriodicAlarm(current); if (current.sync.phase === 'historical' || current.sync.phase === 'incremental') await runSync(current.sync.done ? 'incremental' : 'historical').catch(() => undefined); }); });
 void schedulePeriodicAlarm();
-void chrome.storage.local.setAccessLevel({ accessLevel: 'TRUSTED_CONTEXTS' });
-void chrome.storage.session.setAccessLevel({ accessLevel: 'TRUSTED_CONTEXTS' });
+void browserApi().storage.local.setAccessLevel?.({ accessLevel: 'TRUSTED_CONTEXTS' });
+void browserApi().storage.session.setAccessLevel?.({ accessLevel: 'TRUSTED_CONTEXTS' });
 
 async function assertGeneration(expected: number): Promise<void> {
   if ((await getSettings()).jobGeneration !== expected) throw new Error('Operation cancelled because account, repository, or vault state changed.');

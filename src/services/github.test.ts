@@ -69,6 +69,15 @@ describe('GitHub Contents API', () => {
     expect(fetcher).toHaveBeenCalledTimes(1);
   });
 
+  it('recognizes an exact generated-content match only when sync explicitly enables safe adoption', async () => {
+    const content = 'exact generated Codeforces solution';
+    const sha = await githubBlobSha(content);
+    const fetcher = vi.fn(async () => new Response(JSON.stringify({ sha, content: btoa(content), encoding: 'base64' }), { status: 200 }));
+    const plan = await new GithubClient(auth, fetcher as typeof fetch).prepareFileWrite(repo, 'Codeforces/1/A.cpp', content, { targetExpectedAbsent: true, adoptExactMatch: true });
+    expect(plan).toMatchObject({ sha, contentSha: sha, noop: true, matchedExistingContent: true });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
   it('verifies unchanged tracked content only when the current GitHub SHA matches the saved ownership SHA', async () => {
     const fetcher = vi.fn(async () => new Response(JSON.stringify({ sha: 'recorded-sha', content: 'irrelevant', encoding: 'base64' }), { status: 200 }));
     await new GithubClient(auth, fetcher as typeof fetch).verifyOwnedFile(repo, 'tracked.cpp', 'recorded-sha');

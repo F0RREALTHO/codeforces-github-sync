@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => ({
   cancelOnPrepare: false,
   changeFiltersOnFetch: false,
   collisionPaths: new Set<string>(),
+  exactMatchPaths: new Set<string>(),
   lock: false,
   secrets: { codeforcesCredentials: { apiKey: 'key', apiSecret: 'secret' }, github: { accessToken: 'test', login: 'owner' } },
 }));
@@ -59,7 +60,7 @@ vi.mock('../services/github', () => {
   FileOwnershipError: MockFileOwnershipError,
   GithubClient: class {
     constructor(_auth: unknown, _fetcher?: unknown, private beforeWrite: () => Promise<void> = async () => undefined) {}
-    async prepareFileWrite(repo: unknown, path: string, content: string, expectation: { ownedSha?: string; allowPendingContentSha?: string; targetExpectedAbsent: boolean }) {
+    async prepareFileWrite(repo: unknown, path: string, content: string, expectation: { ownedSha?: string; allowPendingContentSha?: string; adoptExactMatch?: boolean; targetExpectedAbsent: boolean }) {
       if (mocks.collisionPaths.has(path)) throw new MockFileOwnershipError('Destination path is occupied by an unowned or changed file.');
       if (mocks.cancelOnPrepare && mocks.settings) {
         mocks.cancelOnPrepare = false;
@@ -67,14 +68,16 @@ vi.mock('../services/github', () => {
         mocks.settings.sync.phase = 'paused';
       }
       const contentSha = `sha:${content}`;
-      return { repo, path, content, contentSha, sha: expectation.ownedSha, noop: expectation.allowPendingContentSha === contentSha };
+      const matchedExistingContent = expectation.adoptExactMatch && mocks.exactMatchPaths.has(path);
+      return { repo, path, content, contentSha, sha: matchedExistingContent ? contentSha : expectation.ownedSha, noop: Boolean(matchedExistingContent), matchedExistingContent: Boolean(matchedExistingContent) };
     }
     async verifyOwnedFile(_repo: unknown, path: string, recordedSha?: string) {
       mocks.operations.push(`verify:${path}:${recordedSha || 'missing'}`);
       if (!recordedSha || mocks.collisionPaths.has(path)) throw new MockFileOwnershipError(recordedSha ? 'Tracked file was changed outside the extension.' : 'Cannot verify ownership: missing recorded SHA.');
     }
-    async commitFileWrite(plan: { path: string; content: string; contentSha: string }, _message: string) {
+    async commitFileWrite(plan: { path: string; content: string; contentSha: string; sha?: string; noop?: boolean }, _message: string) {
       await this.beforeWrite();
+      if (plan.noop) { mocks.operations.push(`noop:${plan.path}`); return plan.sha || plan.contentSha; }
       if (mocks.failFirstWrite) { mocks.failFirstWrite = false; throw new Error('temporary GitHub outage'); }
       mocks.uploaded.push({ path: plan.path, content: plan.content });
       mocks.operations.push(`write:${plan.path}`);
@@ -121,6 +124,7 @@ describe('durable sync engine', () => {
     mocks.cancelOnPrepare = false;
     mocks.changeFiltersOnFetch = false;
     mocks.collisionPaths = new Set();
+    mocks.exactMatchPaths = new Set();
     mocks.lock = false;
     vi.stubGlobal('chrome', { alarms: { create: vi.fn(), clear: vi.fn() } });
   });
@@ -203,6 +207,22 @@ describe('durable sync engine', () => {
     await runSync('historical');
     expect(mocks.uploaded).toHaveLength(1);
     expect(mocks.settings?.sync.synced['1-A'].submissionId).toBe(20);
+  });
+
+  it('recognizes exact existing solution content in a fresh browser and records it without a duplicate GitHub write', async () => {
+    const { runSync } = await import('./sync');
+    mocks.settings!.sync = { ...mocks.settings!.sync, synced: {}, uniqueProblems: 0, filesUploaded: 0 };
+    mocks.exactMatchPaths.add('Codeforces/1/A_Problem_A.cpp');
+
+    await runSync('historical');
+
+    expect(mocks.uploaded).toHaveLength(0);
+    expect(mocks.operations).toContain('noop:Codeforces/1/A_Problem_A.cpp');
+    expect(mocks.settings?.sync.synced['1-A']).toMatchObject({ submissionId: 20, path: 'Codeforces/1/A_Problem_A.cpp', sha: expect.any(String) });
+    expect(mocks.history.get('owner/solutions\u000020')).toMatchObject({
+      status: 'uploaded',
+      reason: 'Exact generated solution content already exists in this repository; it was verified and left unchanged.',
+    });
   });
 
   it('applies filters during incremental catch-up and advances the submission cursor for skipped entries', async () => {

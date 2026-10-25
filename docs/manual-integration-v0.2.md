@@ -9,6 +9,8 @@ Use only the test extension build, a dedicated Codeforces account, and a private
 - [ ] Upgrade a v0.1 test profile without removing the extension. Unlock the vault and confirm accounts/repository remain connected.
 - [ ] Confirm the dashboard reports the current ownership-manifest total even before detailed history exists.
 - [ ] Run **Re-import history** once. For records with saved ownership SHAs that still match GitHub, confirm no duplicate commits and detailed history rows appear with no source text or credentials. If a legacy record has no SHA or the remote file changed, confirm it is surfaced for manual resolution and is never silently adopted or overwritten.
+- [ ] Install the same build in a clean second browser profile and connect the same Codeforces account, GitHub account, and repository. Run **Re-import history**; confirm exact generated solution files are recognized, no duplicate GitHub writes occur, and history rows are created in that browser. Confirm the first browser's IndexedDB history is not automatically copied into the second browser.
+- [ ] Change an existing generated solution file in GitHub, then re-import from the second browser. Confirm its different content is not adopted or overwritten and the collision remains visible for resolution.
 - [ ] Before re-import, switch away from a v0.1 repository and back. Confirm legacy rows remain under the old repository; entries without saved GitHub SHAs must be presented as unverifiable rather than silently accepted as owned.
 
 ## History dashboard

@@ -1,3 +1,4 @@
+import { browserApi } from '../platform/browser';
 import type { AuthState } from '../domain/types';
 import { GithubClient } from './github';
 import { readVaultSecrets, updateVaultSecrets } from '../storage/vault';
@@ -13,18 +14,22 @@ export function authConfigured(): boolean { return Boolean(CLIENT_ID && APP_SLUG
 
 export async function connectGithub(): Promise<AuthState> {
   if (!CLIENT_ID || !APP_SLUG || !AUTH_API) throw new Error('GitHub sign-in is not configured in this build yet.');
+  const redirectUri = browserApi().identity.getRedirectURL('github');
   const installState = randomToken(32);
+  // GitHub has one app-level Setup URL, so route installations through the
+  // Worker and carry the browser-specific identity callback inside state.
+  const installStateEnvelope = `v1.${installState}.${base64url(new TextEncoder().encode(redirectUri))}`;
   const installUrl = new URL(`https://github.com/apps/${encodeURIComponent(APP_SLUG)}/installations/new`);
-  installUrl.searchParams.set('state', installState);
-  const installCallback = await chrome.identity.launchWebAuthFlow({ url: installUrl.toString(), interactive: true });
+  installUrl.searchParams.set('state', installStateEnvelope);
+  const installCallback = await browserApi().identity.launchWebAuthFlow({ url: installUrl.toString(), interactive: true });
   if (!installCallback) throw new Error('GitHub App installation was cancelled.');
   const installResult = new URL(installCallback);
-  if (installResult.searchParams.get('state') !== installState || !/^\d+$/.test(installResult.searchParams.get('installation_id') || '')) throw new Error('GitHub App installation could not be verified. Check its configured Setup URL and retry.');
+  const returnedInstallState = installResult.searchParams.get('state');
+  if (returnedInstallState !== installStateEnvelope || installResult.origin + installResult.pathname !== redirectUri || !/^\d+$/.test(installResult.searchParams.get('installation_id') || '')) throw new Error('GitHub App installation could not be verified. Check its configured Setup URL and retry.');
   const installationId = Number(installResult.searchParams.get('installation_id'));
   const state = randomToken(32);
   const verifier = randomToken(48);
   const challenge = await sha256url(verifier);
-  const redirectUri = chrome.identity.getRedirectURL('github');
   const authorize = new URL('https://github.com/login/oauth/authorize');
   authorize.searchParams.set('client_id', CLIENT_ID);
   authorize.searchParams.set('redirect_uri', redirectUri);
@@ -32,7 +37,7 @@ export async function connectGithub(): Promise<AuthState> {
   authorize.searchParams.set('scope', 'offline_access');
   authorize.searchParams.set('code_challenge', challenge);
   authorize.searchParams.set('code_challenge_method', 'S256');
-  const callback = await chrome.identity.launchWebAuthFlow({ url: authorize.toString(), interactive: true });
+  const callback = await browserApi().identity.launchWebAuthFlow({ url: authorize.toString(), interactive: true });
   if (!callback) throw new Error('GitHub sign-in was cancelled.');
   const returned = new URL(callback);
   if (returned.searchParams.get('state') !== state) throw new Error('GitHub sign-in could not be verified. Please retry.');
@@ -115,6 +120,10 @@ async function authRequest<T>(url: string, body: Record<string, string>): Promis
 function randomToken(bytes: number): string {
   const value = crypto.getRandomValues(new Uint8Array(bytes));
   return btoa(String.fromCharCode(...value)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+function base64url(value: Uint8Array): string {
+  let binary = ''; for (const byte of value) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 async function sha256url(value: string): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));

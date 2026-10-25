@@ -1,3 +1,4 @@
+import { browserApi } from '../platform/browser';
 import type { AuthState, CodeforcesCredentials } from '../domain/types';
 
 export interface VaultSecrets { codeforcesCredentials?: CodeforcesCredentials; github?: AuthState; githubRefreshPending?: boolean; }
@@ -14,25 +15,25 @@ function serializeVaultMutation<T>(operation: () => Promise<T>): Promise<T> {
 }
 
 export async function vaultStatus(): Promise<{ exists: boolean; unlocked: boolean }> {
-  const [record, key] = await Promise.all([chrome.storage.local.get(VAULT_KEY), chrome.storage.session.get(SESSION_KEY)]);
+  const [record, key] = await Promise.all([browserApi().storage.local.get(VAULT_KEY), browserApi().storage.session.get(SESSION_KEY)]);
   return { exists: Boolean(record[VAULT_KEY]), unlocked: Boolean(key[SESSION_KEY]) };
 }
 
 export async function openVault(passphrase: string): Promise<{ created: boolean }> {
   if (passphrase.length < 12) throw new Error('Use a vault password with at least 12 characters.');
-  const stored = (await chrome.storage.local.get(VAULT_KEY))[VAULT_KEY] as VaultRecord | undefined;
+  const stored = (await browserApi().storage.local.get(VAULT_KEY))[VAULT_KEY] as VaultRecord | undefined;
   if (stored) {
     const key = await deriveKey(passphrase, fromBase64(stored.salt));
     await decrypt(stored, key);
-    await chrome.storage.session.set({ [SESSION_KEY]: toBase64(await crypto.subtle.exportKey('raw', key)) });
+    await browserApi().storage.session.set({ [SESSION_KEY]: toBase64(await crypto.subtle.exportKey('raw', key)) });
     return { created: false };
   }
   const salt = crypto.getRandomValues(new Uint8Array(16));
   const key = await deriveKey(passphrase, salt);
   const empty: VaultSecrets = {};
   const record = await encrypt(empty, key, toBase64(salt));
-  await chrome.storage.local.set({ [VAULT_KEY]: record });
-  await chrome.storage.session.set({ [SESSION_KEY]: toBase64(await crypto.subtle.exportKey('raw', key)) });
+  await browserApi().storage.local.set({ [VAULT_KEY]: record });
+  await browserApi().storage.session.set({ [SESSION_KEY]: toBase64(await crypto.subtle.exportKey('raw', key)) });
   return { created: true };
 }
 
@@ -41,7 +42,7 @@ export async function readVaultSecrets(): Promise<VaultSecrets> {
 }
 
 async function decryptCurrentVault(): Promise<VaultSecrets> {
-  const record = (await chrome.storage.local.get(VAULT_KEY))[VAULT_KEY] as VaultRecord | undefined;
+  const record = (await browserApi().storage.local.get(VAULT_KEY))[VAULT_KEY] as VaultRecord | undefined;
   if (!record) throw new Error('Set up the local credential vault before connecting accounts.');
   return decrypt(record, await getSessionKey());
 }
@@ -60,17 +61,17 @@ export async function updateVaultSecrets(update: (secrets: VaultSecrets) => Vaul
 }
 
 async function writeCurrentVault(secrets: VaultSecrets): Promise<void> {
-  const stored = (await chrome.storage.local.get(VAULT_KEY))[VAULT_KEY] as VaultRecord | undefined;
+  const stored = (await browserApi().storage.local.get(VAULT_KEY))[VAULT_KEY] as VaultRecord | undefined;
   if (!stored) throw new Error('Set up the local credential vault before connecting accounts.');
   const key = await getSessionKey();
-  await chrome.storage.local.set({ [VAULT_KEY]: await encrypt(secrets, key, stored.salt) });
+  await browserApi().storage.local.set({ [VAULT_KEY]: await encrypt(secrets, key, stored.salt) });
 }
 
-export async function lockVault(): Promise<void> { await chrome.storage.session.remove(SESSION_KEY); }
-export async function resetVault(): Promise<void> { await chrome.storage.local.remove(VAULT_KEY); await chrome.storage.session.remove(SESSION_KEY); }
+export async function lockVault(): Promise<void> { await browserApi().storage.session.remove(SESSION_KEY); }
+export async function resetVault(): Promise<void> { await browserApi().storage.local.remove(VAULT_KEY); await browserApi().storage.session.remove(SESSION_KEY); }
 
 async function getSessionKey(): Promise<CryptoKey> {
-  const value = (await chrome.storage.session.get(SESSION_KEY))[SESSION_KEY] as string | undefined;
+  const value = (await browserApi().storage.session.get(SESSION_KEY))[SESSION_KEY] as string | undefined;
   if (!value) throw new Error('Unlock your local credential vault to continue.');
   return crypto.subtle.importKey('raw', toArrayBuffer(fromBase64(value)), 'AES-GCM', true, ['encrypt', 'decrypt']);
 }

@@ -1,3 +1,4 @@
+import { browserApi } from '../platform/browser';
 import React, { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import type { Settings, VaultStatus } from '../domain/types';
@@ -11,7 +12,7 @@ type UiSettings = Settings & { vault: VaultStatus };
 
 type Message = Record<string, unknown> & { type: string };
 async function send<T>(message: Message): Promise<T> {
-  const response = await chrome.runtime.sendMessage(message) as { ok: boolean; value?: T; error?: string };
+  const response = await browserApi().runtime.sendMessage(message) as { ok: boolean; value?: T; error?: string };
   if (!response?.ok) throw new Error(response?.error || 'The extension background worker did not respond.');
   return response.value as T;
 }
@@ -50,7 +51,7 @@ function App() {
     if (!githubAppClientId || !githubAppSlug || !authApi) { setError('GitHub sign-in is not configured in this build. It needs the GitHub App Client ID, App slug, and authentication Worker URL.'); return; }
     try {
       const origin = new URL(authApi).origin;
-      const granted = await chrome.permissions.request({ origins: [`${origin}/*`] });
+      const granted = await browserApi().permissions.request({ origins: [`${origin}/*`] });
       if (!granted) { setError('Permission for the sign-in service is required to connect GitHub.'); return; }
       await action('GitHub connected.', { type: 'connectGithub' });
     } catch (e) { setError(messageText(e)); }

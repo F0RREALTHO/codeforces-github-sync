@@ -8,7 +8,10 @@ This documents the pinned production extension and OAuth Worker. Production OAut
 | --- | --- | --- |
 | Extension ID | `ahcgidlkjifgfdcalleiijiabidfehjd` | Pinned public key in `public/manifest.json` |
 | Extension origin | `chrome-extension://ahcgidlkjifgfdcalleiijiabidfehjd` | Worker `EXTENSION_ORIGIN` |
-| OAuth redirect URI | `https://ahcgidlkjifgfdcalleiijiabidfehjd.chromiumapp.org/github` | GitHub App Callback URL and Setup URL; Worker `GITHUB_REDIRECT_URI` |
+| Chrome/Brave OAuth redirect URI | `https://ahcgidlkjifgfdcalleiijiabidfehjd.chromiumapp.org/github` | GitHub App Callback URL; Worker `GITHUB_REDIRECT_URI` |
+| Edge store extension ID | `jpenndpejbklhljfpghhddiollhikdgk` | Assigned by Partner Center; Edge package omits `manifest.key` |
+| Edge extension origin | `chrome-extension://jpenndpejbklhljfpghhddiollhikdgk` | Worker `EXTRA_EXTENSION_ORIGINS` |
+| Edge OAuth redirect URI | `https://jpenndpejbklhljfpghhddiollhikdgk.chromiumapp.org/github` | GitHub App Callback URL; Worker `GITHUB_REDIRECT_URIS` |
 | GitHub App slug | `codeforces-github-sync` | Extension `VITE_GITHUB_APP_SLUG` |
 | Worker name | `cfgh-auth` | `backend/wrangler.toml` |
 | Worker base URL | `https://cfgh-auth.kartikeyaaryam7.workers.dev` | Extension `VITE_AUTH_API_BASE_URL` |
@@ -19,10 +22,13 @@ The GitHub App numeric ID is not the OAuth Client ID. `GITHUB_APP_CLIENT_ID` in 
 
 For the production GitHub App **Codeforces GitHub Sync** (`codeforces-github-sync`):
 
-1. Set both **Callback URL** and **Setup URL** to the exact OAuth redirect URI shown above. The extension uses `chrome.identity.getRedirectURL('github')` and validates the installation callback before starting OAuth.
-2. Keep wildcard callback matching disabled. Leave **Request user authorization (OAuth) during installation** disabled; the extension performs a separate PKCE authorization flow after installation.
-3. Enable expiring user-to-server tokens and refresh-token support. The extension requests `offline_access`.
-4. Grant **Metadata: Read-only** and **Contents: Read and write**. Grant **Repository creation: Read and write** only while the create-repository feature is enabled. Restrict App installation to repositories the user chooses. No webhook URL or events are used.
+1. Keep the Chrome/Brave Callback URL above, add the Edge callback `https://jpenndpejbklhljfpghhddiollhikdgk.chromiumapp.org/github`, and keep the Firefox callback `https://208ea976c859f3fa9fe5eb7c94139ef61077879a.extensions.allizom.org/github`. Confirm each browser's runtime `identity.getRedirectURL('github')` before saving App settings. Keep callback wildcard matching disabled.
+2. Set **Setup URL** to `https://cfgh-auth.kartikeyaaryam7.workers.dev/installation-callback`. The extension sends a one-time random state that contains its browser callback; the Worker accepts only callback URIs listed in `GITHUB_REDIRECT_URIS` and redirects the installation result back to that URI. This shared setup endpoint is required because a GitHub App has one Setup URL for all browsers.
+3. Leave **Request user authorization (OAuth) during installation** disabled; the extension performs a separate PKCE authorization flow after installation.
+4. Enable expiring user-to-server tokens and refresh-token support. The extension requests `offline_access`.
+5. Grant **Metadata: Read-only** and **Contents: Read and write**. Grant **Repository creation: Read and write** only while the create-repository feature is enabled. Restrict App installation to repositories the user chooses. No webhook URL or events are used.
+
+The Edge store assigned CRX ID `jpenndpejbklhljfpghhddiollhikdgk` while the listing is in review. Its callback and origin are now listed above and in the local production Worker configuration. The Worker must be redeployed, and the Edge callback must be added to the production GitHub App, before Edge OAuth will work. No deployment or GitHub App setting change is performed by this repository update.
 
 GitHub references: [setup URL behavior](https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app/about-the-setup-url), [user authorization and token flow](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-a-user-access-token-for-a-github-app), and [App permissions](https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app/choosing-permissions-for-a-github-app).
 
@@ -30,9 +36,9 @@ GitHub references: [setup URL behavior](https://docs.github.com/en/apps/creating
 
 - `backend/wrangler.toml` is the production config. `backend/wrangler.test.toml` is a sanitized test template; copy it to ignored `backend/wrangler.test.local.toml` and enter test-only public identifiers there. Keep the test secret in ignored `backend/.dev.vars`. Never deploy the template or local override as production.
 - The production manifest requests only `https://cfgh-auth.kartikeyaaryam7.workers.dev/*` as an optional host permission. Test builds replace it with the local Worker origin.
-- The Worker accepts only the exact configured extension `Origin`, `POST`/`OPTIONS`, and `/token` or `/refresh`. A custom Worker domain would require a matching extension optional host permission and a rebuild.
-- `/token` requires the exact configured redirect URI and a valid PKCE verifier. The extension verifies the OAuth `state` before calling the Worker. The Worker itself does not validate state.
-- The installation callback has a separate state check and numeric `installation_id` check in the extension.
+- Chrome/Brave origins are exact allowlisted values. Firefox uses profile-specific `moz-extension://<uuid>` origins, so `ALLOW_FIREFOX_EXTENSION_ORIGINS` permits only that browser-origin scheme and UUID shape; this is a CORS transport gate, not an authentication mechanism. OAuth authorization still depends on exact redirect allowlisting, the PKCE verifier, and GitHub's single-use authorization code.
+- `/token` requires an exact URI in `GITHUB_REDIRECT_URIS` and a valid PKCE verifier. The extension validates OAuth state. `/installation-callback` accepts only numeric installation IDs, a well-formed state envelope, and an exact allowlisted redirect URI; it does not exchange tokens or establish the local installation as successful.
+- Keep the GitHub App Setup URL at `https://cfgh-auth.kartikeyaaryam7.workers.dev/installation-callback`; it is shared across browsers. Add the Edge callback URL to the GitHub App manually. The live Worker must be redeployed before Edge OAuth will work; this repository change does not deploy it.
 - The only secret required by the Worker source is `GITHUB_APP_CLIENT_SECRET`. Its value is hidden in Cloudflare and must never be placed in `wrangler.toml`, `.env.local`, `VITE_*`, source control, or support messages.
 
 The extension build uses these public variables in ignored `.env.local`:

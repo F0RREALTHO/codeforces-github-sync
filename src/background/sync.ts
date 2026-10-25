@@ -1,3 +1,4 @@
+import { browserApi } from '../platform/browser';
 import { acceptedLatest, problemKey, solutionContent } from '../domain/solutions';
 import { filterReason } from '../domain/filters';
 import type { CfSubmission, SyncHistoryEntry, SyncState } from '../domain/types';
@@ -57,7 +58,7 @@ export async function runSync(mode: 'historical' | 'incremental' = 'incremental'
       sync.nextFrom = 1;
     }
     if (!await saveSyncForJob(generation, sync)) throw new SyncCancelled();
-    await chrome.alarms.create(RECOVERY_ALARM, { delayInMinutes: 0.5, periodInMinutes: 0.5 });
+    await browserApi().alarms.create(RECOVERY_ALARM, { delayInMinutes: 0.5, periodInMinutes: 0.5 });
     await assertActive(generation);
     await cleanupRetiredFiles(github, settings.repository, sync, generation);
 
@@ -159,12 +160,12 @@ export async function runSync(mode: 'historical' | 'incremental' = 'incremental'
         try {
           const sourcePlan = await github.prepareFileWrite(settings.repository, file.path, content, savedPending
             ? { ownedSha: savedPending.expectedSha, targetExpectedAbsent: savedPending.expectedAbsent, allowPendingContentSha: savedPending.contentSha }
-            : { ownedSha: prior?.path === file.path ? priorSha : undefined, targetExpectedAbsent: prior?.path !== file.path || !priorSha });
+            : { ownedSha: prior?.path === file.path ? priorSha : undefined, targetExpectedAbsent: prior?.path !== file.path || !priorSha, adoptExactMatch: true });
           await assertActive(generation);
           const metadataPlan = file.metadataFile
             ? await github.prepareFileWrite(settings.repository, file.metadataFile.path, file.metadataFile.content, savedPending
               ? { ownedSha: savedPending.metadataExpectedSha, targetExpectedAbsent: savedPending.metadataExpectedAbsent ?? true, allowPendingContentSha: savedPending.metadataContentSha }
-              : { ownedSha: priorMetadataPath === file.metadataFile.path ? priorMetadataSha : undefined, targetExpectedAbsent: priorMetadataPath !== file.metadataFile.path || !priorMetadataSha })
+              : { ownedSha: priorMetadataPath === file.metadataFile.path ? priorMetadataSha : undefined, targetExpectedAbsent: priorMetadataPath !== file.metadataFile.path || !priorMetadataSha, adoptExactMatch: true })
             : undefined;
           await assertActive(generation);
           sync.pendingWrite = {
@@ -192,10 +193,10 @@ export async function runSync(mode: 'historical' | 'incremental' = 'incremental'
           sync.pendingWrite = undefined;
           delete sync.failed[key];
           sync.uniqueProblems = Object.keys(sync.synced).length;
-          sync.filesUploaded += 1;
+          if (!sourcePlan.matchedExistingContent) sync.filesUploaded += 1;
           sync.lastSubmissionId = Math.max(sync.lastSubmissionId, submission.id);
           await saveDurableOwnership(settings.repository.fullName, settings.codeforcesHandle, key, sync.synced[key]);
-          await recordHistoryEntry({ ...historyBase, status: prior ? 'updated' : 'uploaded', recordedAt: Date.now(), filePath: file.path });
+          await recordHistoryEntry({ ...historyBase, status: prior ? 'updated' : 'uploaded', recordedAt: Date.now(), filePath: file.path, ...(sourcePlan.matchedExistingContent ? { reason: 'Exact generated solution content already exists in this repository; it was verified and left unchanged.' } : {}) });
           if (!await saveSyncForJob(generation, sync)) throw new SyncCancelled();
           await cleanupRetiredFiles(github, settings.repository, sync, generation);
         } catch (error) {
@@ -222,7 +223,7 @@ export async function runSync(mode: 'historical' | 'incremental' = 'incremental'
         sync.phase = 'idle';
         sync.lastRunAt = Date.now();
         if (!await saveSyncForJob(generation, sync)) throw new SyncCancelled();
-        await chrome.alarms.clear(RECOVERY_ALARM);
+        await browserApi().alarms.clear(RECOVERY_ALARM);
         completed = true;
         break;
       }
@@ -235,15 +236,15 @@ export async function runSync(mode: 'historical' | 'incremental' = 'incremental'
       }
       if (!await saveSyncForJob(generation, sync)) throw new SyncCancelled();
       if (sync.phase === 'idle') {
-        await chrome.alarms.clear(RECOVERY_ALARM);
+        await browserApi().alarms.clear(RECOVERY_ALARM);
         completed = true;
         if (mode === 'incremental') break;
       }
       if (page.length === PAGE_SIZE) await wait(100);
     }
-    if (sync.phase === 'paused' || sync.phase === 'idle') await chrome.alarms.clear(RECOVERY_ALARM);
+    if (sync.phase === 'paused' || sync.phase === 'idle') await browserApi().alarms.clear(RECOVERY_ALARM);
   } catch (error) {
-    await chrome.alarms.clear(RECOVERY_ALARM);
+    await browserApi().alarms.clear(RECOVERY_ALARM);
     if (!(error instanceof SyncCancelled) && generation >= 0) {
       await setSyncErrorForJob(generation, error instanceof Error ? error.message : 'Unexpected synchronization error.');
     }
