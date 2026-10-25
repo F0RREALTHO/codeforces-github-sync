@@ -17,6 +17,9 @@ temp/
 *.log
 *.tsbuildinfo
 
+# Assets prepared for the abandoned Chrome Web Store listing
+public/store-assets/
+
 # Local environment configuration. Keep checked-in templates available.
 .env
 .env.*
