@@ -1,0 +1,9 @@
+name = "cfgh-auth-local-test"
+main = "src/index.ts"
+compatibility_date = "2026-10-01"
+
+[vars]
+# Test-only values supplied for the local OAuth test environment.
+GITHUB_APP_CLIENT_ID = "REPLACE_WITH_TEST_GITHUB_APP_CLIENT_ID"
+EXTENSION_ORIGIN = "chrome-extension://REPLACE_WITH_TEST_EXTENSION_ID"
+GITHUB_REDIRECT_URI = "https://REPLACE_WITH_TEST_EXTENSION_ID.chromiumapp.org/github"

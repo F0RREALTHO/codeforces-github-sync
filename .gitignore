@@ -1,0 +1,69 @@
+# Dependencies and generated build/test output
+node_modules/
+dist/
+dist-test/
+coverage/
+.nyc_output/
+.vite/
+.vitest/
+test-results/
+playwright-report/
+release/
+/outputs/
+tmp/
+temp/
+*.tmp
+*.temp
+*.log
+*.tsbuildinfo
+
+# Local environment configuration. Keep checked-in templates available.
+.env
+.env.*
+.env*
+!.env.example
+!.env.test.example
+!.env.production.example
+!.env.development.example
+
+# Cloudflare Worker local variables and state
+.dev.vars
+.dev.vars.*
+**/.dev.vars
+**/.dev.vars.*
+!backend/.dev.vars.example
+**/.wrangler/
+**/wrangler.*.local.toml
+
+# Browser profiles, integration-test data, and local work areas
+/work/
+**/chrome-*-profile/
+**/browser-profile/
+**/browser-profiles/
+**/chrome-profile/
+**/brave-profile/
+
+# Signing identities, private keys, certificates, and packaged extensions
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.crx
+privatekey.*
+*_private.*
+id_rsa*
+id_ed25519*
+
+# Local credentials and runtime state
+.credentials/
+.secrets/
+**/.credentials/
+**/.secrets/
+credentials.local.*
+secrets.local.*
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*

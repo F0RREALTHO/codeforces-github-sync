@@ -1,0 +1,11 @@
+name = "cfgh-auth"
+main = "src/index.ts"
+compatibility_date = "2026-10-01"
+
+[vars]
+# Public production values. The extension ID is pinned for GitHub Releases
+# distribution. Replace only the Client ID placeholder from production App
+# settings. Never put the App client secret here; configure it as a Worker secret.
+GITHUB_APP_CLIENT_ID = "Iv23liH8zbK7b5lU48qt"
+EXTENSION_ORIGIN = "chrome-extension://ahcgidlkjifgfdcalleiijiabidfehjd"
+GITHUB_REDIRECT_URI = "https://ahcgidlkjifgfdcalleiijiabidfehjd.chromiumapp.org/github"

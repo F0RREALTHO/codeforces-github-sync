@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Privacy policy for Codeforces → GitHub Sync, a browser extension that backs up Accepted Codeforces solutions to a GitHub repository chosen by the user.">
+    <title>Privacy Policy — Codeforces → GitHub Sync</title>
+    <style>
+      :root { color-scheme: light; font: 16px/1.65 system-ui, sans-serif; color: #182625; background: #f5f8f7; }
+      body { max-width: 760px; margin: 48px auto; padding: 0 22px; }
+      h1 { line-height: 1.2; }
+      h2 { margin-top: 32px; font-size: 20px; }
+      a { color: #18775e; }
+      small { color: #687674; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Privacy policy</h1>
+      <small>Last updated October 25, 2026 · Version 0.2.0</small>
+
+      <p>Codeforces → GitHub Sync is a browser extension that helps you copy Accepted Codeforces solutions to a GitHub repository you select.</p>
+
+      <h2>Information the extension handles</h2>
+      <ul>
+        <li><strong>Codeforces account and submissions:</strong> your handle and API key are used for Codeforces API requests. Your API secret is used locally to sign requests. The extension also processes submission IDs, contest and problem details, programming language, rating and tags when available, submission time, verdict, and source returned by Codeforces.</li>
+        <li><strong>GitHub account and repository:</strong> GitHub provides your account name and repository information. The extension handles OAuth access and refresh tokens, the selected repository, sync status, generated file paths, and GitHub file SHAs used to verify files the extension previously wrote.</li>
+        <li><strong>Preferences and history:</strong> the extension stores sync settings, filters, progress checkpoints, and compact history entries such as submission and problem metadata, outcome, timestamp, and file path. The history ledger does not store complete solution source code.</li>
+      </ul>
+
+      <h2>How information is used and shared</h2>
+      <p>The extension sends signed requests from your browser to the <a href="https://codeforces.com/apiHelp">Codeforces API</a> to verify a handle and read submission history, including source when Codeforces returns it. The API key and request signature are sent to Codeforces; the API secret is used to create the signature and is not included in the request.</p>
+      <p>When syncing, the extension sends the selected Accepted solution source and associated problem metadata from your browser to the <a href="https://docs.github.com/en/rest">GitHub API</a>. It can list repositories available to the authorized account, create a repository if you choose that option, read existing files to check ownership, and create or update generated solution files. When a tracked solution changes its file extension, the extension may remove the previous tracked file after successfully writing its replacement. It does not intentionally modify unrelated repository files.</p>
+      <p>GitHub sign-in uses a GitHub App and OAuth with PKCE. The extension sends the authorization code and PKCE verifier to the project's Cloudflare Worker, which uses the GitHub App client secret held in its Worker environment to exchange them with GitHub and return token data. The Worker also forwards refresh-token requests to GitHub and returns rotated tokens. The Worker processes OAuth data but is not sent Codeforces solution source or GitHub repository file contents. The Worker code does not configure a database for these requests; this policy does not make claims about hosting-provider operational logs or retention.</p>
+      <p>The GitHub App is installed for the repositories you authorize. Its configured permissions include repository metadata read access and repository contents read/write access; repository creation is used if you choose to create a repository from the extension. GitHub displays the app's permissions and repository access during authorization and installation.</p>
+
+      <h2>Local storage and credential protection</h2>
+      <p>Codeforces credentials and GitHub tokens are stored in the browser's extension-local storage as ciphertext encrypted with AES-256-GCM. The encryption key is derived from your vault password using PBKDF2-SHA-256. While the vault is unlocked, the key is held in Chrome's session storage and is restricted to trusted extension contexts. The session storage key is not a separate hardware-backed security boundary: browser or extension compromise while unlocked may expose data available to the extension.</p>
+      <p>Settings and sync checkpoints are stored in extension-local storage. Compact sync history and repository ownership records are stored in IndexedDB in the browser profile. Ownership records contain repository and account identifiers, generated file paths, submission IDs, and file SHAs; they contain neither solution source nor credentials. These records let the extension verify a previously written file by comparing its current GitHub SHA with the locally saved ownership record.</p>
+
+      <h2>Retention and your controls</h2>
+      <p>The extension does not set a time-based retention period or automatically expire sync-history and ownership records. Those records remain in the browser profile across account disconnects and vault resets until you clear the extension's browser data or remove the extension. Removing an account clears that provider's locally stored credentials and connection settings; it does not delete committed GitHub files, erase the persistent history and ownership ledger, or uninstall/revoke the GitHub App. You can revoke the app separately in GitHub settings and remove synced files from the repository yourself.</p>
+      <p>You can pause sync, disable automatic sync, disconnect either account, lock or reset the credential vault, and clear the extension's browser data. After a browser restart, the vault must be unlocked again with its password. If you forget that password, the extension cannot recover it; resetting the vault removes stored credentials and you must reconnect your accounts.</p>
+
+      <h2>Analytics and advertising</h2>
+      <p>The extension contains no analytics or advertising feature and does not intentionally send usage telemetry. Information is handled to provide the Codeforces-to-GitHub synchronization features described above.</p>
+
+      <h2>Contact</h2>
+      <p>For privacy or support questions, email <a href="mailto:kartikeyaaryam03@gmail.com">kartikeyaaryam03@gmail.com</a>.</p>
+    </main>
+  </body>
+</html>

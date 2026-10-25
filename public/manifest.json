@@ -1,0 +1,41 @@
+{
+  "manifest_version": 3,
+  "name": "Codeforces → GitHub Sync",
+  "version": "0.2.0",
+  "minimum_chrome_version": "120",
+  "description": "Back up your Accepted Codeforces solutions to a GitHub repository.",
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_title": "Codeforces Sync",
+    "default_popup": "index.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png"
+    }
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "permissions": [
+    "storage",
+    "alarms",
+    "identity"
+  ],
+  "optional_host_permissions": [
+    "https://cfgh-auth.kartikeyaaryam7.workers.dev/*"
+  ],
+  "host_permissions": [
+    "https://codeforces.com/*",
+    "https://api.github.com/*"
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  },
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAuun2Ass3pJyR3bx450PckYWSa+ru79cqKMS4ovaVJcVUvkCdqaBhZ5rFNZhsGiCiSOcDed4vQwqvX3Kg4iXYeWJvgKUGOoh3NJNXj+ZwVk9KP7bYboFqQEOw9tuw7LWWWzWAYvxDAhHDkPNxVHTWJRVNjqruzrz5FSmhT7dkFdNDidykGE7U3toWBBMyNws5vhmz+1fQ9wymGpZyuz4pfXGGPLHo98Et8z0fFnlwX/FKdchaX6pDNwMaa8+9bqMhdFgYyYjrowGSYvE8UMKFHMOAuIzZSyp2ktPvX/+45C6tMT9Pk3d6WjTEXW7p5Gn2eWCf7dh9/SmgWtCUF/wSmwIDAQAB"
+}
