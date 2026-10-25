@@ -1,85 +1,183 @@
-# Codeforces → GitHub Sync
+<p align="center">
+  <img src="public/icons/icon128.png" width="84" height="84" alt="Codeforces to GitHub Sync Logo" />
+</p>
 
-Import your Accepted Codeforces solutions into a GitHub repository, then keep them in sync automatically.
+<h1 align="center">Codeforces → GitHub Sync</h1>
 
-[Download the latest release](https://github.com/F0RREALTHO/codeforces-github-sync/releases/latest) · [Privacy policy](https://f0rrealtho.github.io/codeforces-github-sync/public/privacy.html) · [Support](mailto:kartikeyaaryam03@gmail.com)
+<p align="center">
+  <strong>Automatically import and synchronize your Accepted Codeforces solutions to your personal GitHub repository.</strong><br>
+  Built with privacy-first client-side vault encryption, Git blob SHA conflict protection, and cross-browser support.
+</p>
 
-## Screenshots
+<p align="center">
+  <a href="https://github.com/F0RREALTHO/codeforces-github-sync/releases/latest"><img src="https://img.shields.io/badge/Release-v0.2.0-2563EB?style=for-the-badge&logo=github" alt="Release v0.2.0" /></a>
+  <a href="https://github.com/F0RREALTHO/codeforces-github-sync/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/F0RREALTHO/codeforces-github-sync/ci.yml?branch=main&style=for-the-badge&label=CI&logo=githubactions&logoColor=white" alt="CI Status" /></a>
+  <a href="https://github.com/F0RREALTHO/codeforces-github-sync/actions"><img src="https://img.shields.io/badge/Tests-103%20Passing-10B981?style=for-the-badge&logo=vitest&logoColor=white" alt="103 Tests Passing" /></a>
+  <img src="https://img.shields.io/badge/TypeScript-5.x-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/License-MIT-gray?style=for-the-badge" alt="MIT License" />
+</p>
 
-**Sync overview**
+<p align="center">
+  <a href="#-quick-start">Quick Start</a> •
+  <a href="#-browser-availability">Browser Status</a> •
+  <a href="#-key-features">Key Features</a> •
+  <a href="#-architecture">Architecture</a> •
+  <a href="#-security--privacy">Security</a> •
+  <a href="#-troubleshooting">FAQ</a> •
+  <a href="https://f0rrealtho.github.io/codeforces-github-sync/public/privacy.html">Privacy Policy</a>
+</p>
 
-![Extension popup showing connected Codeforces and GitHub accounts, a selected repository, and sync status](docs/images/sync-overview.png)
+---
 
-**Dashboard and selective sync filters**
+## 📸 Overview
 
-![Sync history dashboard with statistics and selective synchronization filter controls](docs/images/sync-filters.png)
+<table align="center" width="100%">
+  <tr>
+    <td width="33%" align="center">
+      <strong>Popup Sync Overview</strong><br><br>
+      <img src="docs/images/sync-overview.png" alt="Sync Overview" style="max-width:100%;" />
+    </td>
+    <td width="33%" align="center">
+      <strong>Dashboard & Custom Filters</strong><br><br>
+      <img src="docs/images/sync-filters.png" alt="Sync Filters" style="max-width:100%;" />
+    </td>
+    <td width="33%" align="center">
+      <strong>Verified Submission History</strong><br><br>
+      <img src="docs/images/submission-history.png" alt="Submission History" style="max-width:100%;" />
+    </td>
+  </tr>
+</table>
 
-**Submission history**
+---
 
-![Submission history table showing uploaded and skipped results with repository paths](docs/images/submission-history.png)
+## 🌐 Browser Availability
 
-## Install and start syncing
+| Browser | Status | Distribution |
+| :--- | :--- | :--- |
+| **Google Chrome** | 🟢 Manual (ZIP) | [Download Latest Release ZIP](https://github.com/F0RREALTHO/codeforces-github-sync/releases/latest) *(Chrome Web Store coming Dec 2026)* |
+| **Brave Browser** | 🟢 Supported | Load unpacked release via `brave://extensions` |
+| **Mozilla Firefox** | 🟡 In Review | Firefox AMO listing awaiting final review |
+| **Microsoft Edge** | 🟡 In Review | Microsoft Edge Add-ons listing in review |
 
-1. Download the ZIP from [Releases](https://github.com/F0RREALTHO/codeforces-github-sync/releases/latest) and extract it.
-2. Open `chrome://extensions` in Chrome or `brave://extensions` in Brave. Turn on **Developer mode**, choose **Load unpacked**, and select the extracted folder containing `manifest.json`.
-3. Open the extension and create a vault passphrase.
-4. Connect Codeforces using your handle and API key/secret from [Codeforces API settings](https://codeforces.com/settings/api).
-5. Choose **Install & connect** for GitHub, approve the app, and select the repository where your solutions should go.
-6. Click **Start historical import**.
+> [!NOTE]
+> Edge and Firefox use browser-specific builds with isolated local vaults. Each browser profile maintains its own encrypted vault and sync history.
 
-That’s it. The extension checks for newer Accepted submissions automatically. Keep the extracted folder where it is. To update, download and extract the newer ZIP over that folder, then click **Reload** on the browser’s extensions page. Updates are manual. Do not remove the extension to update; that can erase its local vault and history.
+---
 
-### Browser availability
+## ✨ Key Features
 
-- **Chrome and Brave:** use the GitHub Release ZIP and the unpacked-install steps above.
-- **Microsoft Edge:** the Edge Add-ons submission is in review. The Edge store package has its own store-assigned extension identity; use the store listing once it is approved and published.
-- **Firefox:** the Firefox AMO submission is awaiting review. Install from the AMO listing once it is approved and published.
+* ⚡ **Historical Backfill & Live Polling:** Seamlessly imports your past Accepted submissions while continuously polling for newly solved problems.
+* 🛡️ **Zero Secret Leakage:** No broad GitHub Personal Access Tokens (PATs) required. All tokens are encrypted using **PBKDF2 + AES-GCM** inside an isolated client-side vault.
+* 🔍 **Git-Blob Conflict Protection:** Uses Git SHA-1 hashing to verify exact code matching before writing. It never overwrites your existing custom files or creates duplicate commits.
+* 📁 **Organized Directory Structure:** Automatically sorts code into clean, intuitive folders:
+  ```
+  Codeforces/
+  └── 1900/
+      └── A_Cover_in_Water.cpp
+  ```
+* 🎯 **Selective Sync Filtering:** Filter which solutions sync based on tags, rating limits, or contest types directly from the dashboard.
+* 🔄 **Resilient Sync Engine:** Handles Codeforces pagination offsets, GitHub rate-limiting with exponential backoff & jitter, and network reconnections gracefully.
 
-Edge and Firefox use browser-specific builds. Each browser profile keeps its own vault and sync history; history is not automatically shared between browsers. See the [browser store submission guide](docs/STORE_SUBMISSION.md) for maintainer build and submission details.
+---
 
-## What it does
+## 🚀 Quick Start
 
-- Saves solutions under `Codeforces/<contest>/<problem>_<name>.<extension>`.
-- Shows sync history and lets you filter which submissions sync. Filters are off by default.
-- Protects unrelated or changed GitHub files: when a new browser profile imports history, it recognizes an existing solution only if its full Git blob SHA matches the exact generated Codeforces solution. It leaves that file untouched and records the verified ownership locally; files that merely occupy the same path or have different content still need resolution.
-- Encrypts credentials in a local vault. History and ownership records are stored in each browser profile, not automatically shared between browsers or devices. To populate history in another browser, connect the same accounts and repository there, then run **Re-import history**; exact matching solutions are recognized without duplicate GitHub writes. No GitHub Personal Access Token is used.
+1. **Download the Extension:**
+   Grab the production build from [Releases](https://github.com/F0RREALTHO/codeforces-github-sync/releases/latest) and extract the `.zip` file.
+2. **Install in Your Browser:**
+   - Go to `chrome://extensions` (or `brave://extensions`).
+   - Enable **Developer mode** (top-right toggle).
+   - Click **Load unpacked** and select the folder containing `manifest.json`.
+3. **Initialize Your Vault:**
+   Open the extension popup and create a master vault passphrase.
+4. **Connect Codeforces:**
+   Enter your handle and API credentials from [Codeforces API settings](https://codeforces.com/settings/api).
+5. **Connect GitHub:**
+   Click **Install & connect**, authorize the app, and choose the target repository.
+6. **Start Historical Import:**
+   Hit **Start historical import** to archive your past solutions. Going forward, the extension monitors and syncs new AC submissions automatically!
 
-Codeforces may not return source for every submission. If it does not, that submission is reported and older code is not substituted. Because Codeforces uses offset-based history pages, run **Re-import history** after submissions have settled if you need to reconcile a large import.
+> [!TIP]
+> Keep the extracted folder in a permanent location. To update to a newer release, simply overwrite the folder files and click **Reload** in `chrome://extensions`—never uninstall the extension to update, as that clears your local vault.
 
-## Troubleshooting
+---
 
-- **“GitHub sign-in is not configured in this build.”** Use the production ZIP from Releases, not a development or test build. The published v0.2.0 ZIP includes production sign-in settings. If you still see this in that release, contact support with your extension version and browser. Do not edit configuration files or send secrets.
-- **“Could not reach the sign-in service.”** Check your internet connection and retry.
-- **A destination collision is reported.** The existing file differs from the exact solution being imported or its ownership cannot be verified. Review the file in GitHub before moving/renaming it and retrying; the extension will not overwrite changed or unrelated content.
-- **The vault is locked after restarting the browser.** Unlock it with your vault passphrase. If you forget it, reset the vault and reconnect; the encrypted credentials cannot be recovered without the passphrase.
-- **An import stopped.** Reopen the extension, unlock the vault, and let it resume from its saved checkpoint.
+## 🏗️ Architecture
 
-Questions? Email [kartikeyaaryam03@gmail.com](mailto:kartikeyaaryam03@gmail.com). Never include passwords, API secrets, OAuth codes, tokens, or private solution source in a support request.
+```mermaid
+flowchart LR
+    CF["Codeforces API\n(User Status)"] --> Ext["Extension Sync Engine\n(Deduplication & Git Blob SHA)"]
+    Ext <--> Vault[("Local Encrypted Vault\n(AES-GCM / PBKDF2)")]
+    Ext <--> Worker["Cloudflare Auth Worker\n(OAuth & Token Refresh)"]
+    Worker <--> GH["GitHub API\n(Repo Commits)"]
+```
+
+---
+
+## 🔒 Security & Privacy
+
+* **Local Master Key:** Your Codeforces credentials and OAuth tokens are encrypted at rest using `AES-GCM-256` with keys derived via `PBKDF2-SHA256` (100,000 iterations).
+* **OAuth Security:** Extension authentication uses PKCE (Proof Key for Code Exchange) and an isolated Cloudflare Worker proxy so that no client secrets are ever bundled into extension source code.
+* **Granular Scope:** Only requires minimal permissions necessary for reading Codeforces submissions and writing solutions to your chosen repository.
+
+---
+
+## ❓ Troubleshooting & FAQ
 
 <details>
-<summary>For contributors: build and test</summary>
+<summary><strong>"GitHub sign-in is not configured in this build."</strong></summary><br>
+Make sure you are using the official release ZIP from the Releases tab, not an unpacked development build. Production releases are pre-configured with production OAuth client credentials.
+</details>
 
-Requirements: Node.js 22+ and npm.
+<details>
+<summary><strong>"A destination collision is reported."</strong></summary><br>
+A file already exists at the target path in your GitHub repository, but its Git SHA differs from the solution being imported. Review or rename the file on GitHub before re-attempting import to prevent accidental overwrites.
+</details>
 
-```sh
+<details>
+<summary><strong>"The vault is locked after restarting my browser."</strong></summary><br>
+Enter your vault passphrase to unlock it. If you forget your passphrase, you can reset the vault and reconnect your accounts (the encrypted credentials cannot be recovered without the passphrase).
+</details>
+
+---
+
+## 🛠️ For Developers & Contributors
+
+<details>
+<summary><strong>Building and running locally</strong></summary><br>
+
+### Prerequisites
+* Node.js 22+
+* npm
+
+```bash
+# Clone the repository
+git clone https://github.com/F0RREALTHO/codeforces-github-sync.git
+cd codeforces-github-sync
+
+# Install dependencies
 npm ci
+
+# Run test suites (103 unit & integration tests)
 npm test
+
+# Build production bundles
 npm run build
-npm run build:test
+npm run build:firefox
+npm run build:edge
 ```
 
-The production build is in `dist/`; the isolated test build is in `dist-test/`. These folders are for unpacked local testing. Public production build settings belong in ignored `.env.local`; test settings belong in ignored `.env.test.local`. Never put a GitHub App Client Secret in a `VITE_*` variable. For local Worker secrets, use ignored `backend/.dev.vars`.
+The compiled outputs will be generated in `dist/`, `dist-firefox/`, and `dist-edge/`.
 
-To check the Worker:
-
-```sh
-cd backend
-npm ci
-npm run check
-```
-
-On Windows, run `scripts/package-release.ps1` after `npm run build` to create a clean production ZIP. Review its file list and SHA-256 before attaching it to a GitHub Release.
-
-Architecture and maintainer guides: [production configuration](docs/PRODUCTION_CONFIGURATION.md), [extension identity](docs/EXTENSION_IDENTITY.md), and [manual integration checklist](docs/manual-integration-v0.2.md).
+For complete contributor and submission guidelines, see:
+* [Cross Browser Release Guide](docs/CROSS_BROWSER_RELEASE.md)
+* [Store Submission Guide](docs/STORE_SUBMISSION.md)
+* [Production Configuration](docs/PRODUCTION_CONFIGURATION.md)
 
 </details>
+
+---
+
+<p align="center">
+  Crafted with ❤️ for competitive programmers. If you find this project helpful, give it a ⭐ on GitHub!
+</p>
