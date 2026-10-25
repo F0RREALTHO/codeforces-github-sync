@@ -10,6 +10,10 @@ jobs:
   test-and-build:
     name: Test & Build
     runs-on: ubuntu-latest
+    env:
+      VITE_GITHUB_APP_CLIENT_ID: Iv23liH8zbK7b5lU48qt
+      VITE_GITHUB_APP_SLUG: codeforces-github-sync
+      VITE_AUTH_API_BASE_URL: https://cfgh-auth.kartikeyaaryam7.workers.dev
 
     steps:
       - name: Checkout repository
