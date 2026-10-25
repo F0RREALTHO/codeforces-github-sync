@@ -2,7 +2,21 @@
 
 Import your Accepted Codeforces solutions into a GitHub repository, then keep them in sync automatically.
 
-[Download the latest release](https://github.com/F0RREALTHO/codeforces-github-sync/releases/latest) · [Privacy policy](public/privacy.html) · [Support](mailto:kartikeyaaryam03@gmail.com)
+[Download the latest release](https://github.com/F0RREALTHO/codeforces-github-sync/releases/latest) · [Privacy policy](https://f0rrealtho.github.io/codeforces-github-sync/public/privacy.html) · [Support](mailto:kartikeyaaryam03@gmail.com)
+
+## Screenshots
+
+**Sync overview**
+
+![Extension popup showing connected Codeforces and GitHub accounts, a selected repository, and sync status](docs/images/sync-overview.png)
+
+**Dashboard and selective sync filters**
+
+![Sync history dashboard with statistics and selective synchronization filter controls](docs/images/sync-filters.png)
+
+**Submission history**
+
+![Submission history table showing uploaded and skipped results with repository paths](docs/images/submission-history.png)
 
 ## Install and start syncing
 
