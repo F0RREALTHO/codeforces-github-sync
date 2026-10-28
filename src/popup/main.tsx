@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { browserApi, hasExtensionRuntime, sendRuntimeMessage } from '../platform/browser';
 import { calculateStreaks, getBrowserTimezone, type StreakResult } from '../domain/streaks';
+import { fmtMins } from '../domain/solutions';
 import type { Settings, VaultStatus } from '../domain/types';
 import type { AcceptedSubmissionRecord } from '../storage/history';
 import type { GithubRepository } from '../services/github';
@@ -261,7 +262,7 @@ function App() {
   const lastRunTime = sync.lastRunAt || 0;
   const nextScheduledTime = lastRunTime && settings.autoSync ? lastRunTime + settings.syncMinutes * 60 * 1000 : null;
   const nextScheduledLabel = nextScheduledTime && nextScheduledTime > Date.now()
-    ? `in ${Math.round((nextScheduledTime - Date.now()) / (60 * 1000))}m`
+    ? `in ${fmtMins(Math.round((nextScheduledTime - Date.now()) / (60 * 1000)))}`
     : settings.autoSync
     ? 'scheduled'
     : 'paused';
@@ -279,11 +280,18 @@ function App() {
             </p>
           </div>
         </div>
-        <div className="popup-actions">
-          <span
-            className={`status-dot ${isRunning ? 'live' : isPaused ? 'paused' : isError ? 'error' : ''}`}
+        <div className="popup-actions" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div
+            style={{ display: 'flex', alignItems: 'center', gap: 5 }}
             title={isRunning ? 'Sync running' : isPaused ? 'Sync paused' : isError ? 'Needs attention' : 'Ready'}
-          />
+          >
+            <span
+              className={`status-dot ${isRunning ? 'live' : isPaused ? 'paused' : isError ? 'error' : ''}`}
+            />
+            <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>
+              {isRunning ? 'LIVE' : isPaused ? 'PAUSED' : isError ? 'ALERT' : 'READY'}
+            </span>
+          </div>
           <ThemeToggle />
           <a
             href="dashboard.html"
@@ -428,7 +436,7 @@ function App() {
                   {sync.needsReimport
                     ? 'Filters updated · Re-import recommended'
                     : sync.lastRunAt
-                    ? `Last sync: ${new Date(sync.lastRunAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · Next: ${nextScheduledLabel}`
+                    ? `Last checked: ${new Date(sync.lastRunAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · Next: ${nextScheduledLabel}`
                     : 'No synchronization executed yet'}
                 </div>
               </div>
@@ -477,8 +485,8 @@ function App() {
                     {streak.isCalculating ? 'Calc…' : !streak.isHistoryComplete && streak.currentStreak === 0 ? 'Incomplete' : `${streak.currentStreak}d`}
                   </span>
                 </div>
-                <span
-                  className="metric-label"
+                <div
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, marginTop: 2 }}
                   title={
                     streak.activeToday
                       ? `Current streak: ${streak.currentStreak}d (Solved today) · Record: ${streak.longestStreak}d`
@@ -487,8 +495,25 @@ function App() {
                       : `Current streak: ${streak.currentStreak}d · All-time record: ${streak.longestStreak}d`
                   }
                 >
-                  {streak.activeToday ? 'Streak · Active' : streak.activeYesterday ? 'Streak · Alive' : 'Streak'}
-                </span>
+                  <span className="metric-label" style={{ margin: 0 }}>STREAK</span>
+                  {(streak.activeToday || streak.activeYesterday) && (
+                    <span
+                      style={{
+                        fontSize: '8px',
+                        fontFamily: 'var(--font-mono)',
+                        padding: '1px 4px',
+                        borderRadius: '3px',
+                        background: streak.activeToday ? 'var(--success-bg)' : 'var(--warning-bg)',
+                        color: streak.activeToday ? 'var(--success)' : 'var(--warning)',
+                        fontWeight: 700,
+                        textTransform: 'uppercase',
+                        lineHeight: 1.1,
+                      }}
+                    >
+                      {streak.activeToday ? 'Active' : 'Alive'}
+                    </span>
+                  )}
+                </div>
                 {streak.longestStreak > 0 && !streak.isCalculating && (
                   <span style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '-2px' }}>
                     Max: {streak.longestStreak}d
@@ -519,7 +544,7 @@ function App() {
                   ? 'Sync running · Solutions verified'
                   : isPaused
                   ? 'Uploads paused · Submissions queued'
-                  : 'Active · Normal sync invariant'}
+                  : 'No contest running, syncing normally'}
               </div>
             </div>
 
@@ -602,8 +627,8 @@ function App() {
               </div>
               {settings.codeforcesHandle ? (
                 <button
-                  className="btn btn-ghost"
-                  style={{ height: 26, fontSize: 'var(--text-xs)', padding: '0 6px' }}
+                  className="btn btn-danger"
+                  style={{ height: 26, fontSize: 'var(--text-xs)', padding: '0 8px' }}
                   onClick={() => void action('Codeforces disconnected.', { type: 'disconnect', provider: 'codeforces' })}
                 >
                   Disconnect
@@ -688,8 +713,8 @@ function App() {
               </div>
               {settings.githubLogin ? (
                 <button
-                  className="btn btn-ghost"
-                  style={{ height: 26, fontSize: 'var(--text-xs)', padding: '0 6px' }}
+                  className="btn btn-danger"
+                  style={{ height: 26, fontSize: 'var(--text-xs)', padding: '0 8px' }}
                   onClick={() => void action('GitHub disconnected.', { type: 'disconnect', provider: 'github' })}
                 >
                   Disconnect

@@ -1,5 +1,25 @@
 import type { CfSubmission } from './types';
 
+export function ratingColor(rating?: number): string {
+  if (!rating || rating < 1200) return '#9ca3af';
+  if (rating < 1400) return '#4ade80';
+  if (rating < 1600) return '#22d3ee';
+  if (rating < 1900) return '#60a5fa';
+  if (rating < 2100) return '#c084fc';
+  if (rating < 2400) return '#fb923c';
+  return '#f87171';
+}
+
+export const fmtMins = (m: number): string =>
+  m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}m`;
+
+const dateFmt = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+export const fmtDate = (ts: number | string | Date): string => {
+  const time = typeof ts === 'number' ? ts : new Date(ts).getTime();
+  if (isNaN(time) || time <= 0) return 'Unknown date';
+  return dateFmt.format(new Date(time));
+};
+
 export function problemKey(problem: CfSubmission['problem']): string {
   return `${problem.contestId ?? 'gym'}-${problem.index}`;
 }

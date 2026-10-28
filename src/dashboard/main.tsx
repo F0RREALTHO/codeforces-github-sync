@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { hasExtensionRuntime, sendRuntimeMessage } from '../platform/browser';
 import { calculateStreaks, getBrowserTimezone, type StreakResult } from '../domain/streaks';
+import { ratingColor, fmtMins, fmtDate } from '../domain/solutions';
 import {
   DEFAULT_SYNC_FILTERS,
   type Settings,
@@ -144,7 +145,7 @@ function Dashboard() {
               contestQueue: {},
               lastRunAt: Date.now() - 1000 * 60 * 35,
             },
-            vault: { exists: true, unlocked: true, version: 2, kdfIterations: 310000, kdfAlgorithm: 'PBKDF2-SHA-256' },
+            vault: { exists: true, unlocked: true, version: 2, kdfIterations: 600000, kdfAlgorithm: 'PBKDF2-SHA-256' },
             consentAcceptedAt: Date.now() - 86400000 * 30,
             autoSync: true,
             syncMinutes: 360,
@@ -519,7 +520,7 @@ function Dashboard() {
   const lastRunTime = sync?.lastRunAt || 0;
   const nextScheduledTime = lastRunTime && state?.autoSync ? lastRunTime + state.syncMinutes * 60 * 1000 : null;
   const nextScheduledFormatted = nextScheduledTime
-    ? new Date(nextScheduledTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    ? `${new Date(nextScheduledTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} (in ${fmtMins(Math.max(1, Math.round((nextScheduledTime - Date.now()) / (60 * 1000))))})`
     : state?.autoSync
     ? 'Scheduled'
     : 'Disabled';
@@ -602,6 +603,22 @@ function Dashboard() {
     }
     return groups;
   })();
+
+  const heatmapMonthLabels = useMemo(() => {
+    if (!streakSummary.heatmapDays || streakSummary.heatmapDays.length === 0) return [];
+    const labels: Array<{ label: string; colIndex: number }> = [];
+    let lastMonth = '';
+    streakSummary.heatmapDays.forEach((day, index) => {
+      const colIndex = Math.floor(index / 7);
+      const month = day.date.slice(5, 7);
+      if (month !== lastMonth) {
+        lastMonth = month;
+        const monthName = new Date(`${day.date}T00:00:00Z`).toLocaleString('en-US', { month: 'short', timeZone: 'UTC' });
+        labels.push({ label: monthName, colIndex });
+      }
+    });
+    return labels;
+  }, [streakSummary.heatmapDays]);
 
   return (
     <div className="dashboard-layout">
@@ -753,11 +770,6 @@ function Dashboard() {
                     {streakSummary.activeToday ? 'Current Streak · Solved Today' : streakSummary.activeYesterday ? 'Current Streak · Alive (Solve today)' : 'Current Streak'}
                   </span>
                 </div>
-                <div className="streak-hero-breakdown">
-                  <span>Record: <strong>{streakSummary.longestStreak}d</strong> (All-time)</span>
-                  <span>Last Year: <strong>{streakSummary.longestStreakLast365}d</strong></span>
-                  <span>Last 30 Days: <strong>{streakSummary.longestStreakLast30}d</strong></span>
-                </div>
               </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -795,7 +807,7 @@ function Dashboard() {
             <article className="stat-box">
               <span className="stat-box-title">Skipped Submissions</span>
               <span className="stat-box-val tabular">{stats.skippedProblems.toLocaleString()}</span>
-              <span className="stat-box-sub">Filtered or non-latest</span>
+              <span className="stat-box-sub">Excluded by filters / deferred</span>
             </article>
 
             <article className="stat-box">
@@ -809,7 +821,7 @@ function Dashboard() {
             </article>
 
             <article className="stat-box">
-              <span className="stat-box-title">Latest Sync</span>
+              <span className="stat-box-title">Last Uploaded</span>
               <span className="stat-box-val tabular" style={{ fontSize: 'var(--text-md)', fontWeight: 500 }}>
                 {latestSuccessfulAt ? new Date(latestSuccessfulAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : 'None yet'}
               </span>
@@ -879,7 +891,7 @@ function Dashboard() {
             </article>
 
             <article className="streak-card">
-              <span className="streak-card-title">Best Streak This Year</span>
+              <span className="streak-card-title">Best Streak (Last 365 Days)</span>
               <span className="streak-card-val tabular">
                 {streakSummary.isCalculating
                   ? 'Calculating…'
@@ -967,6 +979,17 @@ function Dashboard() {
             </div>
 
             <div className="heatmap-scroll-wrapper">
+              <div className="heatmap-months-row" aria-hidden="true">
+                {heatmapMonthLabels.map((m, idx) => (
+                  <span
+                    key={idx}
+                    className="heatmap-month-label"
+                    style={{ gridColumnStart: m.colIndex + 1 }}
+                  >
+                    {m.label}
+                  </span>
+                ))}
+              </div>
               <div className="heatmap-grid" role="grid" aria-label="Solving activity per day">
                 {streakSummary.heatmapDays.map((day) => (
                   <div
@@ -1322,7 +1345,21 @@ function Dashboard() {
                       <span>—</span>
                       <span>{group.problemName}</span>
                       {group.rating !== undefined && (
-                        <span className="badge" style={{ fontSize: 10 }}>★ {group.rating}</span>
+                        <span
+                          className="rating-badge"
+                          style={{
+                            fontSize: 11,
+                            fontWeight: 700,
+                            fontFamily: 'var(--font-mono)',
+                            color: ratingColor(group.rating),
+                            background: `${ratingColor(group.rating)}18`,
+                            border: `1px solid ${ratingColor(group.rating)}40`,
+                            padding: '1px 6px',
+                            borderRadius: '4px',
+                          }}
+                        >
+                          {group.rating}
+                        </span>
                       )}
                     </div>
                     <div className="problem-group-meta">
@@ -1340,50 +1377,33 @@ function Dashboard() {
                   </div>
                   <ul className="problem-group-submissions">
                     {group.submissions.map((sub) => (
-                      <li key={sub.id} className="problem-submission-row">
-                        <div className="submission-item-left">
+                      <li key={sub.id} className="problem-submission-item">
+                        <div className="problem-submission-grid">
                           <a
                             href={`https://codeforces.com/contest/${sub.contestId}/submission/${sub.submissionId}`}
                             target="_blank"
                             rel="noreferrer"
-                            className="link tabular submission-id"
-                            style={{ fontWeight: 600 }}
+                            className="submission-id-link tabular"
                           >
-                            Submission {sub.submissionId} ↗
+                            #{sub.submissionId} ↗
                           </a>
-                          <span>—</span>
-                          <span
-                            className={`badge ${
-                              sub.status === 'uploaded'
-                                ? 'badge-success'
-                                : sub.status === 'updated'
-                                ? 'badge-accent'
-                                : sub.status === 'skipped'
-                                ? 'badge-warning'
-                                : 'badge-danger'
-                            }`}
-                          >
+                          <span className={`status-pill status-${sub.status}`}>
                             {sub.status.toUpperCase()}
                           </span>
-                          <span>—</span>
-                          <span style={{ fontFamily: 'var(--font-mono)' }}>{sub.programmingLanguage}</span>
-                          {sub.filePath && (
-                            <>
-                              <span>—</span>
-                              <code className="file-path" style={{ fontSize: 11, color: 'var(--text-muted)' }}>{sub.filePath}</code>
-                            </>
-                          )}
-                        </div>
-                        <div className="submission-item-right">
-                          <span className="tabular">
-                            {sub.submittedAt ? new Date(sub.submittedAt).toLocaleString() : 'v0.1 legacy'}
+                          <span className="submission-lang">{sub.programmingLanguage}</span>
+                          <code className="submission-path" title={sub.filePath || ''}>
+                            {sub.filePath || '—'}
+                          </code>
+                          <span className="submission-date tabular">
+                            {sub.submittedAt ? fmtDate(sub.submittedAt) : 'v0.1 legacy'}
                           </span>
-                          {sub.reason && (
-                            <span style={{ fontSize: 10, color: sub.status === 'failed' ? 'var(--danger)' : 'var(--text-muted)' }}>
-                              {sub.reason}
-                            </span>
-                          )}
                         </div>
+                        {sub.reason && (
+                          <div className="submission-reason-row">
+                            <span className="submission-reason-tag">Note:</span>
+                            <span className="submission-reason-text">{sub.reason}</span>
+                          </div>
+                        )}
                       </li>
                     ))}
                   </ul>
@@ -1432,22 +1452,12 @@ function Dashboard() {
                         </a>
                       </td>
                       <td>
-                        <span
-                          className={`badge ${
-                            entry.status === 'uploaded'
-                              ? 'badge-success'
-                              : entry.status === 'updated'
-                              ? 'badge-accent'
-                              : entry.status === 'skipped'
-                              ? 'badge-warning'
-                              : 'badge-danger'
-                          }`}
-                        >
+                        <span className={`status-pill status-${entry.status}`}>
                           {entry.status.toUpperCase()}
                         </span>
                       </td>
                       <td className="tabular" style={{ color: 'var(--text-secondary)' }}>
-                        {entry.submittedAt ? new Date(entry.submittedAt).toLocaleString() : 'v0.1 legacy'}
+                        {entry.submittedAt ? fmtDate(entry.submittedAt) : 'v0.1 legacy'}
                       </td>
                       <td>
                         <div style={{ fontWeight: 500, fontSize: 11 }}>{entry.repositoryFullName}</div>
@@ -1755,9 +1765,9 @@ function Dashboard() {
 
               <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border-subtle)', fontSize: 'var(--text-xs)', color: 'var(--text-secondary)' }}>
                 <strong>File Tree Layout: </strong>
-                <code>Codeforces/&lt;rating-or-contest&gt;/&lt;problem-index&gt;_&lt;problem-name&gt;.&lt;ext&gt;</code>
+                <code>Codeforces/&lt;rating&gt;/&lt;contest&gt;&lt;index&gt;_&lt;problem_name&gt;/&lt;submissionId&gt;.&lt;ext&gt;</code>
                 <div style={{ marginTop: 4, color: 'var(--text-muted)' }}>
-                  Each synchronized problem includes a clean comment header with direct problem links, submission IDs, and Git blob SHA conflict hashes.
+                  Multi-solution preservation: every Accepted submission is saved under its problem folder using its unique Codeforces submission ID. Multiple approaches, alternative languages, and optimized solutions are preserved independently without overwriting.
                 </div>
               </div>
             </div>

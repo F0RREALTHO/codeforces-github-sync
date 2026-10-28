@@ -6,6 +6,10 @@
   --font-body: system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 
+  /* Form & Surface Tokens */
+  --surface-2: #1b2230;
+  --border: #2a3446;
+
   /* Typography Scale */
   --text-xs: 0.6875rem;   /* 11px */
   --text-sm: 0.75rem;     /* 12px */
@@ -131,6 +135,9 @@
   --warning-bg: rgba(217, 119, 6, 0.08);
   --warning-border: rgba(217, 119, 6, 0.25);
 
+  --surface-2: #f1f5f9;
+  --border: #cbd5e1;
+
   --danger: #dc2626;
   --danger-bg: rgba(220, 38, 38, 0.08);
   --danger-border: rgba(220, 38, 38, 0.25);
@@ -220,4 +227,114 @@ h1, h2, h3, h4, .stat-value, .stat-box-val, .metric-value, .hero-streak-num, .po
   font-size: 11px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
+}
+
+/* Form Controls & Button System (Pass fonts & colors to controls) */
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+input,
+select {
+  color-scheme: dark;
+}
+
+input[type="checkbox"] {
+  accent-color: var(--accent, #6cb6f5);
+}
+
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+input[type="text"],
+input[type="password"],
+input[type="number"],
+input[type="date"],
+select,
+textarea {
+  background: var(--surface-2, #1b2230);
+  border: 1px solid var(--border, #2a3446);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  color: var(--text-primary);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+input[type="text"]:focus,
+input[type="password"]:focus,
+input[type="number"]:focus,
+input[type="date"]:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--accent, #6cb6f5);
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(108, 182, 245, 0.2);
+}
+
+/* Global Button Styles */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: var(--surface-2, #1b2230);
+  border: 1px solid var(--border, #2a3446);
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: var(--text-xs);
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: none;
+  transition: all var(--transition-fast);
+}
+
+.btn:hover:not(:disabled) {
+  border-color: var(--accent, #6cb6f5);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--accent, #6cb6f5);
+  color: #0b1220;
+  border-color: transparent;
+  font-weight: 600;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #58a6e6;
+  border-color: transparent;
+}
+
+.btn-danger {
+  color: #f87171;
+  background: transparent;
+  border: 1px solid rgba(248, 113, 113, 0.4);
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: rgba(248, 113, 113, 0.12);
+  border-color: #f87171;
+}
+
+.btn-ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--text-secondary);
+}
+
+.btn-ghost:hover:not(:disabled) {
+  background: var(--bg-surface-hover);
+  color: var(--text-primary);
+  border-color: var(--border-default);
 }

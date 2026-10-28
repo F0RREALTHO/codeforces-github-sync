@@ -84,7 +84,7 @@
   - Tracks **Current Streak**, **All-time Record**, **Best Last 365 Days**, and **Best Last 30 Days**.
   - Animated flame icon with 6 reactive intensity tiers (Dormant $\rightarrow$ Kindling $\rightarrow$ Ember $\rightarrow$ Blaze $\rightarrow$ Inferno $\rightarrow$ Legendary Plasma) that dynamically evolve as your streak climbs.
 * 🛡️ **Contest-Aware Upload Protection:** Invariant sync guard that detects active or ongoing Codeforces contest participation. During live contests, newly submitted solutions are automatically held in an encrypted local staging queue and synced only after the round concludes—eliminating any risk of accidental code leaks or plagiarism disqualification.
-* 🔒 **Zero Secret Leakage Vault:** No plain-text storage and no broad GitHub Personal Access Tokens (PATs). Credentials and OAuth tokens are secured using client-side **PBKDF2-SHA256 (310,000 iterations)** and **AES-GCM-256** encryption.
+* 🔒 **Zero Secret Leakage Vault:** No plain-text storage and no broad GitHub Personal Access Tokens (PATs). Credentials and OAuth tokens are secured using client-side **PBKDF2-SHA256 (600,000 iterations)** and **AES-GCM-256** encryption.
 * 🔍 **Git-Blob Conflict Protection:** Uses Git SHA-1 hashing to verify exact code matching before writing. It never overwrites your existing custom files or creates duplicate commits.
 * 🎯 **Granular Sync Filtering:** Filter which solutions sync based on tags, rating thresholds (e.g. 800 to 3500), language selection, or contest IDs directly from the dashboard.
 * 🔄 **Resilient Sync Engine:** Handles Codeforces pagination offsets, GitHub API rate limits with exponential backoff & jitter, and network reconnections gracefully.
@@ -121,7 +121,7 @@ CommitForce communicates directly with the **official Codeforces REST API** usin
 | **Contest Submissions Supported?** | ✅ **Yes** (Via authenticated API signatures) | ⚠️ Only if submission page is loaded | ❌ **No** (`ACCESS_DENIED_ERROR` on contest code) |
 | **Contest Anti-Plagiarism Safety** | ✅ **Yes** (Auto-defers during live contest windows) | ❌ No (Pushes immediately or breaks) | ❌ No |
 | **Multi-Solution Preservation** | ✅ **Yes** (Preserves every AC by Submission ID) | ❌ Overwrites by Problem ID | ❌ Overwrites by Problem ID |
-| **Credential Security** | 🔒 **Client-Side Vault (PBKDF2 310k + AES-GCM)** | ⚠️ Plain browser storage | ⚠️ Plain browser storage |
+| **Credential Security** | 🔒 **Client-Side Vault (PBKDF2 600k + AES-GCM)** | ⚠️ Plain browser storage | ⚠️ Plain browser storage |
 | **Rate Limit Protection** | ✅ **2.1s Inter-Call Queue + Jittered Backoff** | ⚠️ None / Tab-dependent | ⚠️ Basic |
 
 ---
@@ -178,7 +178,7 @@ flowchart TD
     ContestGuard -->|No| Writer["GitHub Commit Writer\n(Direct Git Blob Creation)"]
     Queue -.->|Contest Concluded| Writer
     Engine --> ContestGuard
-    Engine <--> Vault[("Local Encrypted Vault\n(AES-GCM / PBKDF2 310k Iterations)")]
+    Engine <--> Vault[("Local Encrypted Vault\n(AES-GCM / PBKDF2 600k Iterations)")]
     Writer <--> Worker["Cloudflare Auth Worker\n(PKCE OAuth & Token Refresh)"]
     Worker <--> GH["GitHub API\n(Repository Commits)"]
 ```
@@ -187,7 +187,7 @@ flowchart TD
 
 ## 🔒 Security & Privacy
 
-* **Local Master Key:** Your Codeforces credentials and OAuth tokens are encrypted at rest using `AES-GCM-256` with keys derived via `PBKDF2-SHA256` (310,000 iterations conforming to modern OWASP standards).
+* **Local Master Key:** Your Codeforces credentials and OAuth tokens are encrypted at rest using `AES-GCM-256` with keys derived via `PBKDF2-SHA256` (600,000 iterations conforming to modern OWASP standards).
 * **OAuth Security:** Extension authentication uses PKCE (Proof Key for Code Exchange) and an isolated Cloudflare Worker proxy so that no client secrets are ever bundled into extension source code.
 * **Granular Scope:** Only requires minimal permissions necessary for reading Codeforces submissions and writing solutions to your chosen repository.
 
