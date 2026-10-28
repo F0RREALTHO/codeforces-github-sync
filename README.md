@@ -39,24 +39,24 @@
     <td width="30%" align="center" valign="top">
       <strong>Extension Popup & Flame Tier</strong><br>
       <sub>Instant status, streak tier, and sync controls</sub><br><br>
-      <img src="docs/images/sync-overview.png?v=2" alt="CommitForce Popup Overview" style="max-width:100%; border-radius: 8px;" />
+      <img src="docs/images/sync-overview.png?v=3" alt="CommitForce Popup Overview" style="max-width:100%; border-radius: 8px;" />
     </td>
     <td width="70%" align="center" valign="top">
       <strong>Developer Dashboard & Streak Engine</strong><br>
       <sub>Personal streak records, activity heatmaps, and sync metrics</sub><br><br>
-      <img src="docs/images/dashboard-overview.png?v=2" alt="CommitForce Developer Dashboard" style="max-width:100%; border-radius: 8px;" />
+      <img src="docs/images/dashboard-overview.png?v=3" alt="CommitForce Developer Dashboard" style="max-width:100%; border-radius: 8px;" />
     </td>
   </tr>
   <tr>
     <td width="50%" align="center" valign="top">
       <strong>Problem-Grouped Submission Ledger</strong><br>
       <sub>Multi-solution preservation with dedicated submission tracking</sub><br><br>
-      <img src="docs/images/submission-history.png?v=2" alt="Multi-Solution History Ledger" style="max-width:100%; border-radius: 8px;" />
+      <img src="docs/images/submission-history.png?v=3" alt="Multi-Solution History Ledger" style="max-width:100%; border-radius: 8px;" />
     </td>
     <td width="50%" align="center" valign="top">
       <strong>Contest Safety & Selective Sync Filters</strong><br>
       <sub>Rating windows, tag filters, and contest protection rules</sub><br><br>
-      <img src="docs/images/sync-filters.png?v=2" alt="Selective Sync Filters" style="max-width:100%; border-radius: 8px;" />
+      <img src="docs/images/sync-filters.png?v=3" alt="Selective Sync Filters" style="max-width:100%; border-radius: 8px;" />
     </td>
   </tr>
 </table>
