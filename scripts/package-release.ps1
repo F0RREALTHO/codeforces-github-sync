@@ -148,7 +148,7 @@ try {
   }
   if ($names -match '^store-assets/') { throw 'Archive should not include non-runtime store assets.' }
   $unexpected = @($names | Where-Object {
-    $_ -notmatch '^(manifest\.json|index\.html|dashboard\.html|privacy\.html|background\.js|assets/[A-Za-z0-9._-]+\.(js|css|woff2?)|icons/icon(16|32|48|128)\.png)$'
+    $_ -notmatch '^(manifest\.json|index\.html|dashboard\.html|privacy\.html|background\.js|assets/[A-Za-z0-9._-]+\.(js|css|woff2?)|icons/[A-Za-z0-9._-]+\.(png|svg)|commitforce-[A-Za-z0-9._-]+\.(png|svg))$'
   })
   if ($unexpected.Count -gt 0) { throw 'Archive contains files outside the approved runtime allowlist.' }
 } finally {
