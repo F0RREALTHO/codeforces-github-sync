@@ -13,7 +13,7 @@
   <a href="https://github.com/F0RREALTHO/codeforces-github-sync/releases/latest"><img src="https://img.shields.io/badge/Release-v0.2.0-2563EB?style=for-the-badge&logo=github" alt="Release v0.2.0" /></a>
   <a href="https://github.com/F0RREALTHO/codeforces-github-sync/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/F0RREALTHO/codeforces-github-sync/ci.yml?branch=main&style=for-the-badge&label=CI&logo=githubactions&logoColor=white" alt="CI Status" /></a>
   <a href="https://github.com/F0RREALTHO/codeforces-github-sync/actions"><img src="https://img.shields.io/badge/Tests-138%20Passing-10B981?style=for-the-badge&logo=vitest&logoColor=white" alt="138 Tests Passing" /></a>
-  <img src="https://img.shields.io/badge/PBKDF2-310k%20Iterations-8B5CF6?style=for-the-badge&logo=security" alt="Vault Security" />
+  <img src="https://img.shields.io/badge/PBKDF2-600k%20Iterations-8B5CF6?style=for-the-badge&logo=security" alt="Vault Security" />
   <img src="https://img.shields.io/badge/TypeScript-5.x-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript" />
   <img src="https://img.shields.io/badge/License-MIT-gray?style=for-the-badge" alt="MIT License" />
 </p>
@@ -39,24 +39,24 @@
     <td width="30%" align="center" valign="top">
       <strong>Extension Popup & Flame Tier</strong><br>
       <sub>Instant status, streak tier, and sync controls</sub><br><br>
-      <img src="docs/images/sync-overview.png" alt="CommitForce Popup Overview" style="max-width:100%; border-radius: 8px;" />
+      <img src="docs/images/sync-overview.png?v=2" alt="CommitForce Popup Overview" style="max-width:100%; border-radius: 8px;" />
     </td>
     <td width="70%" align="center" valign="top">
       <strong>Developer Dashboard & Streak Engine</strong><br>
       <sub>Personal streak records, activity heatmaps, and sync metrics</sub><br><br>
-      <img src="docs/images/dashboard-overview.png" alt="CommitForce Developer Dashboard" style="max-width:100%; border-radius: 8px;" />
+      <img src="docs/images/dashboard-overview.png?v=2" alt="CommitForce Developer Dashboard" style="max-width:100%; border-radius: 8px;" />
     </td>
   </tr>
   <tr>
     <td width="50%" align="center" valign="top">
       <strong>Problem-Grouped Submission Ledger</strong><br>
       <sub>Multi-solution preservation with dedicated submission tracking</sub><br><br>
-      <img src="docs/images/submission-history.png" alt="Multi-Solution History Ledger" style="max-width:100%; border-radius: 8px;" />
+      <img src="docs/images/submission-history.png?v=2" alt="Multi-Solution History Ledger" style="max-width:100%; border-radius: 8px;" />
     </td>
     <td width="50%" align="center" valign="top">
       <strong>Contest Safety & Selective Sync Filters</strong><br>
       <sub>Rating windows, tag filters, and contest protection rules</sub><br><br>
-      <img src="docs/images/sync-filters.png" alt="Selective Sync Filters" style="max-width:100%; border-radius: 8px;" />
+      <img src="docs/images/sync-filters.png?v=2" alt="Selective Sync Filters" style="max-width:100%; border-radius: 8px;" />
     </td>
   </tr>
 </table>
