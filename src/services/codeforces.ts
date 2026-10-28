@@ -60,16 +60,18 @@ export async function rateLimitedCfJson<T>(url: string, fetcher: typeof fetch = 
     return await requestJson<T>(url, undefined, fetcher);
   } finally { unlock(); }
 }
-export async function fetchSubmissionPage(handle: string, from: number, count = 1000, credentials: CodeforcesCredentials, includeSources = true, fetcher: typeof fetch = fetch): Promise<CfSubmission[]> {
+export async function fetchSubmissionPage(handle: string, from: number, count = 1000, credentials?: CodeforcesCredentials, includeSources = true, fetcher: typeof fetch = fetch): Promise<CfSubmission[]> {
   const url = new URL('https://codeforces.com/api/user.status');
   url.searchParams.set('handle', handle);
   url.searchParams.set('from', String(from));
   url.searchParams.set('count', String(count));
   if (includeSources) url.searchParams.set('includeSources', 'true');
-  const timestamp = Math.floor(Date.now() / 1000);
-  url.searchParams.set('apiKey', credentials.apiKey);
-  url.searchParams.set('time', String(timestamp));
-  url.searchParams.set('apiSig', await signCodeforcesRequest(url.searchParams, 'user.status', credentials.apiSecret));
+  if (credentials) {
+    const timestamp = Math.floor(Date.now() / 1000);
+    url.searchParams.set('apiKey', credentials.apiKey);
+    url.searchParams.set('time', String(timestamp));
+    url.searchParams.set('apiSig', await signCodeforcesRequest(url.searchParams, 'user.status', credentials.apiSecret));
+  }
   const result = await rateLimitedCfJson<CfApiResponse<CfSubmission[]>>(url.toString(), fetcher);
   if (result.status !== 'OK' || !Array.isArray(result.result)) throw new ApiError(result.comment || 'Codeforces returned an invalid response.', result.comment?.includes('Call limit') ? 429 : undefined, result.comment?.includes('Call limit') ? 2500 : undefined);
   return result.result;

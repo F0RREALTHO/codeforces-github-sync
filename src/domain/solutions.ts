@@ -42,7 +42,25 @@ export function sanitizeSegment(value: string): string {
   return clean || 'solution';
 }
 
+export function problemFolderIndex(submission: CfSubmission): string {
+  const contest = submission.problem.contestId ?? submission.contestId ?? 0;
+  const rawIndex = (submission.problem.index || '').trim();
+  if (contest > 0 && !rawIndex.toLowerCase().startsWith(String(contest).toLowerCase())) {
+    return `${contest}${rawIndex}`;
+  }
+  return rawIndex || 'problem';
+}
+
 export function solutionPath(submission: CfSubmission): string {
+  const rating = submission.problem.rating ? String(submission.problem.rating) : 'Unrated';
+  const cleanIndex = sanitizeSegment(problemFolderIndex(submission));
+  const cleanName = sanitizeSegment(submission.problem.name);
+  const folderName = `${cleanIndex}_${cleanName}`;
+  const ext = fileExtension(submission.programmingLanguage);
+  return `Codeforces/${rating}/${folderName}/${submission.id}.${ext}`;
+}
+
+export function legacySolutionPath(submission: CfSubmission): string {
   const contest = submission.problem.contestId ?? submission.contestId ?? 0;
   const index = sanitizeSegment(submission.problem.index);
   const name = sanitizeSegment(submission.problem.name);

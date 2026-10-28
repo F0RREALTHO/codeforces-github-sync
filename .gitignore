@@ -18,6 +18,8 @@ temp/
 *.temp
 *.log
 *.tsbuildinfo
+.agent/
+.impeccable/
 
 # Local environment configuration. Keep checked-in templates available.
 .env

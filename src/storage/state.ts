@@ -17,7 +17,7 @@ export async function getSettings(): Promise<Settings> {
   const value = (await browserApi().storage.local.get(SETTINGS_KEY))[SETTINGS_KEY] as Partial<Settings> | undefined;
   let syncFilters = DEFAULT_SETTINGS.syncFilters;
   try { syncFilters = normalizeSyncFilters(value?.syncFilters); } catch { /* Preserve safe defaults when upgrading malformed legacy local settings. */ }
-  return { ...DEFAULT_SETTINGS, ...value, syncFilters, sync: { ...DEFAULT_SETTINGS.sync, ...value?.sync, failed: { ...DEFAULT_SETTINGS.sync.failed, ...value?.sync?.failed }, synced: { ...DEFAULT_SETTINGS.sync.synced, ...value?.sync?.synced }, retiredFiles: { ...DEFAULT_SETTINGS.sync.retiredFiles, ...value?.sync?.retiredFiles } } };
+  return { ...DEFAULT_SETTINGS, ...value, syncFilters, sync: { ...DEFAULT_SETTINGS.sync, ...value?.sync, failed: { ...DEFAULT_SETTINGS.sync.failed, ...value?.sync?.failed }, synced: { ...DEFAULT_SETTINGS.sync.synced, ...value?.sync?.synced }, retiredFiles: { ...DEFAULT_SETTINGS.sync.retiredFiles, ...value?.sync?.retiredFiles }, contestQueue: { ...DEFAULT_SETTINGS.sync.contestQueue, ...value?.sync?.contestQueue } } };
 }
 export async function saveSettings(settings: Settings): Promise<void> { await serialized(() => browserApi().storage.local.set({ [SETTINGS_KEY]: settings })); }
 export async function updateSettings(update: (settings: Settings) => Settings): Promise<Settings> {

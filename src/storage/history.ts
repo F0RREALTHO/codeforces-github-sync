@@ -1,7 +1,7 @@
 import type { SyncedFile, SyncHistoryEntry, SyncHistoryStatus, SyncState } from '../domain/types';
 
 const DB_NAME = 'cfgh.syncHistory';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 export interface HistoryQuery {
   repositoryFullName?: string;
@@ -35,6 +35,14 @@ function openDatabase(): Promise<IDBDatabase> {
       if (!db.objectStoreNames.contains('ownership')) {
         const ownership = db.createObjectStore('ownership', { keyPath: 'id' });
         ownership.createIndex('byRepositoryAndHandle', ['repositoryFullName', 'codeforcesHandle']);
+      }
+      if (!db.objectStoreNames.contains('cf_submissions')) {
+        const cfSubmissions = db.createObjectStore('cf_submissions', { keyPath: 'id' });
+        cfSubmissions.createIndex('byHandle', 'handle');
+        cfSubmissions.createIndex('byHandleAndSubmittedAt', ['handle', 'submittedAt']);
+      }
+      if (!db.objectStoreNames.contains('cf_activity_meta')) {
+        db.createObjectStore('cf_activity_meta', { keyPath: 'handle' });
       }
     };
     request.onsuccess = () => {
@@ -88,8 +96,8 @@ export async function getDurableOwnership(repositoryFullName: string, codeforces
 }
 
 export async function backfillDurableOwnership(repositoryFullName: string, codeforcesHandle: string, sync: SyncState): Promise<void> {
-  for (const [problemKey, file] of Object.entries(sync.synced)) {
-    if (file.sha) await saveDurableOwnership(repositoryFullName, codeforcesHandle, problemKey, file);
+  for (const [key, file] of Object.entries(sync.synced)) {
+    if (file.sha) await saveDurableOwnership(repositoryFullName, codeforcesHandle, key, file);
   }
 }
 
@@ -254,4 +262,160 @@ export async function listHistoryRepositories(): Promise<string[]> {
   });
 }
 
+export interface AcceptedSubmissionRecord {
+  id: number;
+  submittedAt?: number;
+  verdict?: string;
+  problemKey?: string;
+  problemName?: string;
+}
+
+export interface CfActivityRecord {
+  id: number;
+  handle: string;
+  submittedAt: number;
+  verdict: string;
+  problemKey: string;
+  problemName: string;
+  contestId: number;
+  programmingLanguage: string;
+}
+
+export interface CfActivityMeta {
+  handle: string;
+  isFetching: boolean;
+  isComplete: boolean;
+  lastFetchedAt: number;
+  totalSubmissions: number;
+  oldestSubmissionId?: number;
+  newestSubmissionId?: number;
+  error?: string;
+}
+
+export async function saveCfActivityRecords(records: CfActivityRecord[]): Promise<void> {
+  if (records.length === 0) return;
+  const db = await openDatabase();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('cf_submissions', 'readwrite');
+    const store = tx.objectStore('cf_submissions');
+    for (const record of records) {
+      store.put(record);
+    }
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error || new Error('Could not persist Codeforces activity records.'));
+    tx.onabort = () => reject(tx.error || new Error('Persisting Codeforces activity records was aborted.'));
+  });
+}
+
+export async function getCfActivityRecords(handle: string): Promise<CfActivityRecord[]> {
+  const db = await openDatabase();
+  const normalized = handle.trim().toLowerCase();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('cf_submissions', 'readonly');
+    const index = tx.objectStore('cf_submissions').index('byHandle');
+    const request = index.openCursor(IDBKeyRange.only(normalized));
+    const records: CfActivityRecord[] = [];
+    request.onsuccess = () => {
+      const cursor = request.result;
+      if (!cursor) return;
+      records.push(cursor.value as CfActivityRecord);
+      cursor.continue();
+    };
+    tx.oncomplete = () => resolve(records);
+    tx.onerror = () => reject(tx.error || new Error('Could not query Codeforces activity records.'));
+    tx.onabort = () => reject(tx.error || new Error('Querying Codeforces activity records was aborted.'));
+  });
+}
+
+export async function getCfActivityMeta(handle: string): Promise<CfActivityMeta | undefined> {
+  const db = await openDatabase();
+  const normalized = handle.trim().toLowerCase();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('cf_activity_meta', 'readonly');
+    const request = tx.objectStore('cf_activity_meta').get(normalized);
+    request.onsuccess = () => resolve(request.result as CfActivityMeta | undefined);
+    tx.onerror = () => reject(tx.error || new Error('Could not read Codeforces activity metadata.'));
+    tx.onabort = () => reject(tx.error || new Error('Reading Codeforces activity metadata was aborted.'));
+  });
+}
+
+export async function saveCfActivityMeta(meta: CfActivityMeta): Promise<void> {
+  const db = await openDatabase();
+  const normalized: CfActivityMeta = { ...meta, handle: meta.handle.trim().toLowerCase() };
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('cf_activity_meta', 'readwrite');
+    tx.objectStore('cf_activity_meta').put(normalized);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error || new Error('Could not save Codeforces activity metadata.'));
+    tx.onabort = () => reject(tx.error || new Error('Saving Codeforces activity metadata was aborted.'));
+  });
+}
+
+export async function getAllAcceptedSubmissions(repositoryFullName?: string, codeforcesHandle?: string): Promise<AcceptedSubmissionRecord[]> {
+  const db = await openDatabase();
+  const map = new Map<number, AcceptedSubmissionRecord>();
+
+  // 1. Read from cf_submissions (if handle is specified or all cached cf_submissions)
+  await new Promise<void>((resolve) => {
+    try {
+      const tx = db.transaction('cf_submissions', 'readonly');
+      const store = tx.objectStore('cf_submissions');
+      const request = codeforcesHandle
+        ? store.index('byHandle').openCursor(IDBKeyRange.only(codeforcesHandle.trim().toLowerCase()))
+        : store.openCursor();
+      request.onsuccess = () => {
+        const cursor = request.result;
+        if (!cursor) return;
+        const entry = cursor.value as CfActivityRecord;
+        if (entry.verdict === 'OK') {
+          map.set(entry.id, {
+            id: entry.id,
+            submittedAt: entry.submittedAt,
+            verdict: 'OK',
+            problemKey: entry.problemKey,
+            problemName: entry.problemName,
+          });
+        }
+        cursor.continue();
+      };
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => resolve();
+      tx.onabort = () => resolve();
+    } catch {
+      resolve();
+    }
+  });
+
+  // 2. Read from sync events
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction('events', 'readonly');
+    const request = repositoryFullName && repositoryFullName !== 'all'
+      ? tx.objectStore('events').index('byRepository').openCursor(IDBKeyRange.only(repositoryFullName))
+      : tx.objectStore('events').openCursor();
+    request.onsuccess = () => {
+      const cursor = request.result;
+      if (!cursor) return;
+      const entry = cursor.value as SyncHistoryEntry;
+      if (entry.submissionId > 0 && entry.status !== 'failed') {
+        if (!map.has(entry.submissionId)) {
+          map.set(entry.submissionId, {
+            id: entry.submissionId,
+            submittedAt: entry.submittedAt,
+            verdict: 'OK',
+            problemKey: entry.problemKey,
+            problemName: entry.problemName,
+          });
+        }
+      }
+      cursor.continue();
+    };
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error || new Error('Could not read accepted submissions from history.'));
+    tx.onabort = () => reject(tx.error || new Error('Read accepted submissions was interrupted.'));
+  });
+
+  return Array.from(map.values());
+}
+
 export function resetHistoryDatabaseForTests(): void { databasePromise?.then((db) => db.close()).catch(() => undefined); databasePromise = undefined; }
+

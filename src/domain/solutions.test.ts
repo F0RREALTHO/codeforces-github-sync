@@ -20,10 +20,20 @@ describe('solution selection and paths', () => {
     expect(fileExtension('Rust 1.80')).toBe('rs');
     expect(fileExtension('unrecognized')).toBe('txt');
   });
-  it('sanitizes filenames and groups by contest', () => {
+  it('sanitizes filenames and groups by rating and problem folder with submissionId filename', () => {
     const item = submission(8, 'OK', 'GNU C++20', 'A*', '../bad name?');
     expect(sanitizeSegment('../bad name?')).toBe('bad_name');
-    expect(solutionPath(item)).toBe('Codeforces/1000/A_bad_name.cpp');
+    expect(solutionPath(item)).toBe('Codeforces/800/1000A_bad_name/8.cpp');
+  });
+  it('generates independent paths for multiple accepted submissions of the same problem', () => {
+    const sub1 = submission(123456789, 'OK', 'GNU C++17', 'A', 'Two Vessels');
+    const sub2 = submission(123987654, 'OK', 'GNU C++20', 'A', 'Two Vessels');
+    expect(solutionPath(sub1)).toBe('Codeforces/800/1000A_Two_Vessels/123456789.cpp');
+    expect(solutionPath(sub2)).toBe('Codeforces/800/1000A_Two_Vessels/123987654.cpp');
+  });
+  it('places unrated problems in the Unrated folder', () => {
+    const item = { ...submission(999, 'OK', 'Python 3', 'B', 'Secret Problem'), problem: { contestId: 1000, index: 'B', name: 'Secret Problem' } };
+    expect(solutionPath(item)).toBe('Codeforces/Unrated/1000B_Secret_Problem/999.py');
   });
   it('uses valid Python comments without changing the program body', () => {
     const item = submission(10, 'OK', 'Python 3');

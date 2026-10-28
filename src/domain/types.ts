@@ -52,11 +52,31 @@ export interface SyncHistoryEntry {
   reason?: string;
   legacy?: boolean;
 }
+export interface ContestQueueItem {
+  submissionId: number;
+  contestId: number;
+  problemIndex: string;
+  problemKey: string;
+  problemName: string;
+  programmingLanguage: string;
+  submittedAt: number;
+  verdict: string;
+  queuedAt: number;
+  reason: string;
+  submission?: CfSubmission;
+}
+
 export interface AuthState { accessToken: string; refreshToken?: string; expiresAt?: number; refreshTokenExpiresAt?: number; login: string; installationId?: number; }
 export interface CodeforcesCredentials { apiKey: string; apiSecret: string; }
-export interface VaultStatus { exists: boolean; unlocked: boolean; }
+export interface VaultStatus {
+  exists: boolean;
+  unlocked: boolean;
+  version?: number;
+  kdfIterations?: number;
+  kdfAlgorithm?: string;
+}
 export type SyncPhase = 'idle' | 'historical' | 'incremental' | 'paused' | 'error';
-export interface SyncedFile { submissionId: number; path: string; sha?: string; metadataPath?: string; metadataSha?: string; }
+export interface SyncedFile { submissionId: number; path: string; sha?: string; metadataPath?: string; metadataSha?: string; problemKey?: string; }
 export interface SyncState {
   phase: SyncPhase;
   nextFrom: number;
@@ -77,6 +97,7 @@ export interface SyncState {
   synced: Record<string, SyncedFile>;
   pendingWrite?: { problemKey: string; submissionId: number; path: string; contentSha: string; expectedSha?: string; expectedAbsent: boolean; metadataPath?: string; metadataContentSha?: string; metadataExpectedSha?: string; metadataExpectedAbsent?: boolean };
   retiredFiles: Record<string, string>;
+  contestQueue: Record<number, ContestQueueItem>;
 }
 export interface Settings {
   codeforcesHandle?: string;
@@ -88,8 +109,9 @@ export interface Settings {
   syncFilters: SyncFilters;
   consentAcceptedAt?: number;
   jobGeneration: number;
+  preferredTimezone?: string;
   sync: SyncState;
 }
-export const DEFAULT_SYNC: SyncState = { phase: 'idle', nextFrom: 1, submissionsSeen: 0, acceptedSeen: 0, uniqueProblems: 0, filesUploaded: 0, lastSubmissionId: 0, historicalHighWaterId: undefined, done: false, failed: {}, synced: {}, retiredFiles: {} };
+export const DEFAULT_SYNC: SyncState = { phase: 'idle', nextFrom: 1, submissionsSeen: 0, acceptedSeen: 0, uniqueProblems: 0, filesUploaded: 0, lastSubmissionId: 0, historicalHighWaterId: undefined, done: false, failed: {}, synced: {}, retiredFiles: {}, contestQueue: {} };
 export const DEFAULT_SYNC_FILTERS: SyncFilters = { dateEnabled: false, ratingEnabled: false, tagsEnabled: false, tags: [], languagesEnabled: false, languages: [], contestsEnabled: false, contests: [] };
 export const DEFAULT_SETTINGS: Settings = { autoSync: true, syncMinutes: 360, jobGeneration: 0, sync: DEFAULT_SYNC, syncFilters: DEFAULT_SYNC_FILTERS };

@@ -1,5 +1,6 @@
 param(
-  [string]$OutputDirectory = 'outputs/store-submissions-v0.2.0-edge-keyfix'
+  [string]$OutputDirectory = 'outputs/store-submissions-v0.2.0-edge-keyfix',
+  [switch]$Force = $false
 )
 
 $ErrorActionPreference = 'Stop'
@@ -26,13 +27,25 @@ function Get-PngSize([string]$Path) {
   return @($width, $height)
 }
 
+function Get-RelativePath([string]$BaseDirectory, [string]$Path) {
+  $base = [IO.Path]::GetFullPath($BaseDirectory).TrimEnd('\', '/') + '\'
+  $full = [IO.Path]::GetFullPath($Path)
+  if ($full.StartsWith($base, [StringComparison]::OrdinalIgnoreCase)) {
+    return $full.Substring($base.Length).Replace('\', '/')
+  }
+  $baseUri = [Uri]$base
+  $targetUri = [Uri]$full
+  return [Uri]::UnescapeDataString($baseUri.MakeRelativeUri($targetUri).ToString()).Replace('\', '/')
+}
+
 function Add-DeterministicZip([string]$Root, [string[]]$Files, [string]$Destination) {
   Add-Type -AssemblyName System.IO.Compression
+  Add-Type -AssemblyName System.IO.Compression.FileSystem
   $stream = [IO.File]::Open($Destination, [IO.FileMode]::CreateNew, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
   $archive = [IO.Compression.ZipArchive]::new($stream, [IO.Compression.ZipArchiveMode]::Create, $false)
   try {
     foreach ($file in ($Files | Sort-Object)) {
-      $relative = [IO.Path]::GetRelativePath($Root, $file).Replace('\', '/')
+      $relative = Get-RelativePath $Root $file
       $entry = $archive.CreateEntry($relative, [IO.Compression.CompressionLevel]::Optimal)
       $entry.LastWriteTime = [DateTimeOffset]::new(2000, 1, 1, 0, 0, 0, [TimeSpan]::Zero)
       $input = [IO.File]::OpenRead($file)
@@ -97,7 +110,7 @@ foreach ($path in $sourcePaths) {
   } else { $sourceFiles.Add((Resolve-Path -LiteralPath $absolute).Path) }
 }
 $sourceFiles = @($sourceFiles | Sort-Object -Unique | Where-Object {
-  $relative = [IO.Path]::GetRelativePath($projectRoot, $_).Replace('\', '/')
+  $relative = Get-RelativePath $projectRoot $_
   $relative -notmatch '(^|/)(node_modules|\.git|\.wrangler|dist|dist-test|dist-edge|dist-firefox|release|outputs|work)(/|$)' -and
   $relative -notmatch '(^|/)(\.env(?!\.example$|\.test\.example$)[^/]*|\.dev\.vars[^/]*|wrangler\.[^/]*\.local\.toml)$' -and
   $relative -notmatch '\.(map|pem|key|p12|pfx|crx|sqlite|db)$'
@@ -107,12 +120,18 @@ $sourceArchive = Join-Path $OutputDirectory "Codeforces-GitHub-Sync-Firefox-Sour
 
 $allArchives = @($results | ForEach-Object { $_.Archive }) + $sourceArchive
 foreach ($path in $allArchives) {
-  if (Test-Path -LiteralPath $path) { throw "Refusing to overwrite existing store submission file: $path" }
+  if (Test-Path -LiteralPath $path) {
+    if ($Force) {
+      Remove-Item -LiteralPath $path -Force
+    } else {
+      throw "Refusing to overwrite existing store submission file: $path. Pass -Force to overwrite."
+    }
+  }
 }
 New-Item -ItemType Directory -Path $OutputDirectory -Force | Out-Null
 
 foreach ($result in $results) {
-  $runtimeNames = @($result.Files | ForEach-Object { [IO.Path]::GetRelativePath($result.Root, $_).Replace('\', '/') })
+  $runtimeNames = @($result.Files | ForEach-Object { Get-RelativePath $result.Root $_ })
   Add-DeterministicZip -Root $result.Root -Files $result.Files -Destination $result.Archive
   $null = Assert-Archive -Path $result.Archive -ExpectedNames $runtimeNames
 }

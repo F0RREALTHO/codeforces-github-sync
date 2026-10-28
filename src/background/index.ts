@@ -8,8 +8,47 @@ import { cancelSyncJob, getSettings, saveSyncFilters, updateSettings } from '../
 import { lockVault, openVault, readVaultSecrets, resetVault, updateVaultSecrets, vaultStatus } from '../storage/vault';
 import { runSync } from './sync';
 import { PERIODIC_ALARM, RECOVERY_ALARM, UNLOCKED_ALARM, schedulePeriodicAlarm } from './alarms';
-import { backfillDurableOwnership, backfillLegacyHistory, getDurableOwnership, getHistoryStats, listHistoryRepositories, queryHistory, type HistoryQuery } from '../storage/history';
-type Command = { type: 'state' } | { type: 'vaultUnlock'; passphrase: string } | { type: 'vaultLock' } | { type: 'vaultReset' } | { type: 'connectCodeforces'; handle: string; apiKey: string; apiSecret: string } | { type: 'connectGithub' } | { type: 'repositories' } | { type: 'createRepository'; name: string; isPrivate: boolean } | { type: 'selectRepository'; repository: RepositoryRef } | { type: 'startImport' } | { type: 'syncNow' } | { type: 'retryFailures' } | { type: 'pause' } | { type: 'resume' } | { type: 'settings'; autoSync: boolean; syncMinutes: number } | { type: 'disconnect'; provider: 'github' | 'codeforces' } | { type: 'consent' } | { type: 'historyPage'; query: HistoryQuery } | { type: 'historyStats'; repositoryFullName?: string } | { type: 'historyRepositories' } | { type: 'saveFilters'; filters: Partial<SyncFilters> };
+import {
+  backfillDurableOwnership,
+  backfillLegacyHistory,
+  getDurableOwnership,
+  getHistoryStats,
+  listHistoryRepositories,
+  queryHistory,
+  getAllAcceptedSubmissions,
+  getCfActivityMeta,
+  getCfActivityRecords,
+  type HistoryQuery,
+} from '../storage/history';
+import { syncUserActivity } from '../services/activity';
+import { calculateStreaks, getBrowserTimezone, type QualifyingSubmission } from '../domain/streaks';
+
+type Command =
+  | { type: 'state' }
+  | { type: 'vaultUnlock'; passphrase: string }
+  | { type: 'vaultLock' }
+  | { type: 'vaultReset' }
+  | { type: 'connectCodeforces'; handle: string; apiKey: string; apiSecret: string }
+  | { type: 'connectGithub' }
+  | { type: 'repositories' }
+  | { type: 'createRepository'; name: string; isPrivate: boolean }
+  | { type: 'selectRepository'; repository: RepositoryRef }
+  | { type: 'startImport' }
+  | { type: 'syncNow' }
+  | { type: 'retryFailures' }
+  | { type: 'pause' }
+  | { type: 'resume' }
+  | { type: 'settings'; autoSync: boolean; syncMinutes: number; preferredTimezone?: string }
+  | { type: 'setTimezone'; timezone: string }
+  | { type: 'disconnect'; provider: 'github' | 'codeforces' }
+  | { type: 'consent' }
+  | { type: 'historyPage'; query: HistoryQuery }
+  | { type: 'historyStats'; repositoryFullName?: string }
+  | { type: 'historyRepositories' }
+  | { type: 'saveFilters'; filters: Partial<SyncFilters> }
+  | { type: 'acceptedSubmissions'; repositoryFullName?: string }
+  | { type: 'streakSummary'; timezone?: string; definition?: 'accepted' | 'all'; refresh?: boolean }
+  | { type: 'syncActivity'; force?: boolean };
 
 async function dispatch(message: Command): Promise<unknown> {
   const settings = await getSettings();
@@ -32,6 +71,92 @@ async function dispatch(message: Command): Promise<unknown> {
       const currentRepoStats = settings.repository ? await getHistoryStats(settings.repository.fullName) : undefined;
       const legacyManifestOnly = Math.max(0, settings.sync.uniqueProblems - (currentRepoStats?.uploadedProblems ?? 0));
       return { ...stats, uploadedProblems: stats.uploadedProblems + legacyManifestOnly };
+    }
+    case 'acceptedSubmissions': {
+      const requested = message.repositoryFullName;
+      if (settings.codeforcesHandle) {
+        void getCfActivityMeta(settings.codeforcesHandle).then((meta) => {
+          if (!meta || Date.now() - meta.lastFetchedAt > 30 * 60 * 1000) {
+            return readVaultSecrets().then((sec) => syncUserActivity(settings.codeforcesHandle!, sec?.codeforcesCredentials)).catch(() => undefined);
+          }
+        });
+      }
+      return getAllAcceptedSubmissions(requested && requested !== 'all' ? requested : undefined, settings.codeforcesHandle);
+    }
+    case 'streakSummary': {
+      const handle = settings.codeforcesHandle;
+      const timeZone = message.timezone || settings.preferredTimezone || getBrowserTimezone();
+      const definition = message.definition || 'accepted';
+
+      if (!handle) {
+        return calculateStreaks([], { timeZone, activityDefinition: definition, isCalculating: false, isHistoryComplete: true });
+      }
+
+      let meta = await getCfActivityMeta(handle);
+      let cfRecords = await getCfActivityRecords(handle);
+
+      const needsFetch = message.refresh || !meta || cfRecords.length === 0 || (Date.now() - meta.lastFetchedAt > 30 * 60 * 1000);
+
+      if (needsFetch) {
+        const secrets = await readVaultSecrets().catch(() => undefined);
+        try {
+          meta = await syncUserActivity(handle, secrets?.codeforcesCredentials, Boolean(message.refresh));
+          cfRecords = await getCfActivityRecords(handle);
+        } catch {
+          // Retain whatever records are available
+        }
+      }
+
+      const acceptedHistory = await getAllAcceptedSubmissions(settings.repository?.fullName, handle);
+
+      const contestQueueItems = Object.values(settings.sync.contestQueue || {});
+
+      // Combine and deduplicate
+      const map = new Map<number, QualifyingSubmission>();
+      for (const rec of cfRecords) {
+        map.set(rec.id, {
+          submissionId: rec.id,
+          submittedAt: rec.submittedAt,
+          verdict: rec.verdict,
+          problemName: rec.problemName,
+        });
+      }
+      for (const item of acceptedHistory) {
+        if (!map.has(item.id) && typeof item.submittedAt === 'number' && item.submittedAt > 0) {
+          map.set(item.id, {
+            submissionId: item.id,
+            submittedAt: item.submittedAt,
+            verdict: item.verdict || 'OK',
+            problemName: item.problemName,
+          });
+        }
+      }
+      for (const q of contestQueueItems) {
+        if (!map.has(q.submissionId)) {
+          map.set(q.submissionId, {
+            submissionId: q.submissionId,
+            submittedAt: q.submittedAt,
+            verdict: q.verdict || 'OK',
+            problemName: q.problemName,
+          });
+        }
+      }
+
+      const qualifying = Array.from(map.values());
+      const isCalculating = Boolean(meta?.isFetching && qualifying.length === 0);
+      const isHistoryComplete = meta ? meta.isComplete : false;
+
+      return calculateStreaks(qualifying, {
+        timeZone,
+        activityDefinition: definition,
+        isHistoryComplete,
+        isCalculating,
+      });
+    }
+    case 'syncActivity': {
+      if (!settings.codeforcesHandle) throw new Error('Connect Codeforces first.');
+      const secrets = await readVaultSecrets().catch(() => undefined);
+      return syncUserActivity(settings.codeforcesHandle, secrets?.codeforcesCredentials, message.force);
     }
     case 'saveFilters': {
       const filters = normalizeSyncFilters(message.filters);
@@ -79,7 +204,9 @@ async function dispatch(message: Command): Promise<unknown> {
       await updateVaultSecrets((current) => ({ ...current, codeforcesCredentials: credentials }));
       const sourceAccess = probe.some((submission) => submissionSource(submission) !== undefined) ? 'confirmed' as const : 'unconfirmed' as const;
       const updated = await updateSettings((current) => ({ ...current, codeforcesHandle: canonical, codeforcesSourceAccess: sourceAccess }));
-      await schedulePeriodicAlarm(updated); return updated;
+      await schedulePeriodicAlarm(updated);
+      void syncUserActivity(canonical, credentials).catch(() => undefined);
+      return updated;
     }
     case 'connectGithub': {
       if (!settings.consentAcceptedAt) throw new Error('Accept the data use notice before connecting GitHub.');
@@ -145,8 +272,21 @@ async function dispatch(message: Command): Promise<unknown> {
       await runSync(settings.sync.done ? 'incremental' : 'historical', true); return getSettings();
     case 'settings':
       {
-        const updated = await updateSettings((current) => ({ ...current, autoSync: Boolean(message.autoSync), syncMinutes: Math.max(60, Math.min(1440, Math.round(message.syncMinutes))) }));
+        const updated = await updateSettings((current) => ({
+          ...current,
+          autoSync: Boolean(message.autoSync),
+          syncMinutes: Math.max(60, Math.min(1440, Math.round(message.syncMinutes))),
+          preferredTimezone: typeof message.preferredTimezone === 'string' ? message.preferredTimezone : current.preferredTimezone,
+        }));
         await schedulePeriodicAlarm(updated); return updated;
+      }
+    case 'setTimezone':
+      {
+        const updated = await updateSettings((current) => ({
+          ...current,
+          preferredTimezone: typeof message.timezone === 'string' ? message.timezone : current.preferredTimezone,
+        }));
+        return updated;
       }
     case 'disconnect':
       if (settings.repository) await backfillLegacyHistory(settings.repository.fullName, settings.sync, settings.sync.lastRunAt);

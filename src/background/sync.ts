@@ -1,13 +1,14 @@
 import { browserApi } from '../platform/browser';
-import { acceptedLatest, problemKey, solutionContent } from '../domain/solutions';
+import { problemKey, solutionContent } from '../domain/solutions';
 import { filterReason } from '../domain/filters';
-import type { CfSubmission, SyncHistoryEntry, SyncState } from '../domain/types';
+import type { CfSubmission, SyncedFile, SyncHistoryEntry, SyncState } from '../domain/types';
 import { fetchSubmissionPage, submissionSource } from '../services/codeforces';
 import { FileOwnershipError, GithubClient } from '../services/github';
 import { getUsableAuth } from '../services/github-auth';
 import { backfillDurableOwnership, getDurableOwnership, noteLatestAccepted, recordHistoryEntry, saveDurableOwnership } from '../storage/history';
 import { getSettings, releaseSyncLock, renewSyncLock, saveSyncForJob, setSyncErrorForJob, acquireSyncLock, updateSettings } from '../storage/state';
 import { readVaultSecrets } from '../storage/vault';
+import { checkContestProtection } from '../services/contest';
 import { RECOVERY_ALARM, schedulePeriodicAlarm } from './alarms';
 
 const PAGE_SIZE = 1000;
@@ -35,17 +36,6 @@ export async function runSync(mode: 'historical' | 'incremental' = 'incremental'
       const local = settings.sync.synced[key];
       if (!local || durable.submissionId >= local.submissionId) settings.sync.synced[key] = durable;
     }
-    const secrets = await readVaultSecrets();
-    if (!secrets.codeforcesCredentials || !secrets.github) throw new Error('Unlock your vault and reconnect both accounts before syncing.');
-    let auth = await getUsableAuth(secrets.github);
-    await assertActive(generation);
-    const authProvider = async () => {
-      await assertActive(generation);
-      auth = await getUsableAuth(auth);
-      await assertActive(generation);
-      return auth;
-    };
-    const github = new GithubClient(auth, fetch, () => assertActive(generation), authProvider);
     let sync: SyncState = mode === 'historical' && (settings.sync.done || settings.sync.needsReimport)
       ? { ...settings.sync, phase: 'historical', nextFrom: 1, submissionsSeen: 0, acceptedSeen: 0, historicalHighWaterId: undefined, scanCutoff: undefined, done: false, needsReimport: false, failed: {}, startedAt: Date.now(), error: undefined }
       : { ...settings.sync, phase: mode, startedAt: settings.sync.startedAt || Date.now(), error: undefined };
@@ -58,9 +48,23 @@ export async function runSync(mode: 'historical' | 'incremental' = 'incremental'
       sync.nextFrom = 1;
     }
     if (!await saveSyncForJob(generation, sync)) throw new SyncCancelled();
+
+    const secrets = await readVaultSecrets();
+    if (!secrets.codeforcesCredentials || !secrets.github) throw new Error('Unlock your vault and reconnect both accounts before syncing.');
+    let auth = await getUsableAuth(secrets.github);
+    await assertActive(generation);
+    const authProvider = async () => {
+      await assertActive(generation);
+      auth = await getUsableAuth(auth);
+      await assertActive(generation);
+      return auth;
+    };
+    const github = new GithubClient(auth, fetch, () => assertActive(generation), authProvider);
     await browserApi().alarms.create(RECOVERY_ALARM, { delayInMinutes: 0.5, periodInMinutes: 0.5 });
     await assertActive(generation);
-    await cleanupRetiredFiles(github, settings.repository, sync, generation);
+    const activeSettings = settings as import('../domain/types').Settings & { repository: NonNullable<import('../domain/types').Settings['repository']>; codeforcesHandle: string; githubLogin: string };
+    await cleanupRetiredFiles(github, activeSettings.repository, sync, generation);
+    await processContestQueue(github, activeSettings, sync, generation);
 
     while ((mode === 'historical' ? !sync.done : true) && sync.phase !== 'paused') {
       await assertActive(generation);
@@ -92,122 +96,51 @@ export async function runSync(mode: 'historical' | 'incremental' = 'incremental'
       const relevant = mode === 'incremental'
         ? page.filter((item) => item.id > (sync.scanCutoff ?? 0))
         : page.filter((item) => item.id <= (sync.historicalHighWaterId ?? 0));
-      const latestOnPage = acceptedLatest(relevant);
-      const latestOnPageIds = new Set(latestOnPage.map((submission) => submission.id));
-      const accepted = relevant.filter((submission) => submission.verdict === 'OK').sort((a, b) => b.id - a.id);
+      
+      // Deduplicate by submission ID across page items
+      const seenPageIds = new Set<number>();
+      const uniqueRelevant: CfSubmission[] = [];
+      for (const item of relevant) {
+        if (!seenPageIds.has(item.id)) {
+          seenPageIds.add(item.id);
+          uniqueRelevant.push(item);
+        }
+      }
+      const accepted = uniqueRelevant.filter((submission) => submission.verdict === 'OK');
       for (const submission of accepted) {
         await assertActive(generation);
+        const subKey = String(submission.id);
         const key = problemKey(submission.problem);
-        const prior = sync.synced[key];
+        const prior = sync.synced[subKey] || Object.values(sync.synced).find((s) => s.submissionId === submission.id);
         const historyBase = historyEntry(settings.repository.fullName, submission, key);
-        if (!latestOnPageIds.has(submission.id)) {
-          const newerOnPage = latestOnPage.find((item) => problemKey(item.problem) === key);
-          await recordHistoryEntry({ ...historyBase, status: 'skipped', recordedAt: Date.now(), filePath: prior?.path, reason: `Superseded by newer Accepted submission ${newerOnPage?.id ?? 'on this page'}.` });
-          continue;
-        }
-        const latestId = await noteLatestAccepted(settings.repository.fullName, key, submission.id);
+
+        // Note latest accepted ID for checkpointing without superseding earlier solutions
+        await noteLatestAccepted(settings.repository.fullName, key, submission.id);
         await assertActive(generation);
-        if (latestId > submission.id || (prior && prior.submissionId > submission.id)) {
-          const supersedingId = Math.max(latestId, prior?.submissionId ?? 0);
-          await recordHistoryEntry({ ...historyBase, status: 'skipped', recordedAt: Date.now(), filePath: prior?.path, reason: `Superseded by newer Accepted submission ${supersedingId}.` });
-          continue;
-        }
-        const excluded = filterReason(submission, settings.syncFilters);
-        if (excluded) {
-          await recordHistoryEntry({ ...historyBase, status: 'skipped', recordedAt: Date.now(), filePath: prior?.path, reason: `${excluded}${prior ? ' Existing synchronized file was retained.' : ''}` });
-          continue;
-        }
-        if (prior && prior.submissionId === submission.id) {
-          try {
-            await github.verifyOwnedFile(settings.repository, prior.path, prior.sha);
-            await assertActive(generation);
-            if (prior.metadataPath) {
-              await github.verifyOwnedFile(settings.repository, prior.metadataPath, prior.metadataSha);
-              await assertActive(generation);
-            }
-            await recordHistoryEntry({ ...historyBase, status: 'uploaded', recordedAt: Date.now(), filePath: prior.path, reason: 'Already synchronized; the recorded GitHub ownership SHA still matches.' });
-          } catch (error) {
-            if (error instanceof SyncCancelled) throw error;
-            const reason = error instanceof Error ? error.message : 'Could not verify the tracked GitHub file.';
-            sync.failed[key] = `${submission.id}|${reason}`;
-            await recordHistoryEntry({ ...historyBase, status: 'failed', recordedAt: Date.now(), filePath: prior.path, reason });
-            if (!await saveSyncForJob(generation, sync)) throw new SyncCancelled();
-            if (!(error instanceof FileOwnershipError)) throw error;
-          }
-          continue;
-        }
-        const source = submissionSource(submission);
-        if (typeof source !== 'string' || source.length === 0) {
-          const reason = 'Codeforces did not return source for this Accepted submission.';
-          sync.failed[key] = `${submission.id}|${reason}`;
-          await recordHistoryEntry({ ...historyBase, status: 'failed', recordedAt: Date.now(), filePath: prior?.path, reason });
-          if (!await saveSyncForJob(generation, sync)) throw new SyncCancelled();
-          continue;
-        }
-        const currentSettings = await getSettings();
-        if (currentSettings.jobGeneration !== generation) throw new SyncCancelled();
-        if (currentSettings.codeforcesSourceAccess !== 'confirmed') {
-          await updateSettings((current) => current.jobGeneration === generation ? { ...current, codeforcesSourceAccess: 'confirmed' } : current);
-          await assertActive(generation);
-        }
-        const file = solutionContent(submission, source);
-        const content = `${file.content}${file.content.endsWith('\n') ? '' : '\n'}`;
-        const title = `Sync Codeforces ${submission.problem.contestId}${submission.problem.index}: ${submission.problem.name}`;
-        const savedPending = sync.pendingWrite?.problemKey === key && sync.pendingWrite.submissionId === submission.id && sync.pendingWrite.path === file.path ? sync.pendingWrite : undefined;
-        const priorSha = prior?.sha;
-        const priorMetadataPath = prior?.metadataPath ?? (prior && !prior.sha ? `${prior.path}.metadata.json` : undefined);
-        const priorMetadataSha = prior?.metadataSha;
-        try {
-          const sourcePlan = await github.prepareFileWrite(settings.repository, file.path, content, savedPending
-            ? { ownedSha: savedPending.expectedSha, targetExpectedAbsent: savedPending.expectedAbsent, allowPendingContentSha: savedPending.contentSha }
-            : { ownedSha: prior?.path === file.path ? priorSha : undefined, targetExpectedAbsent: prior?.path !== file.path || !priorSha, adoptExactMatch: true });
-          await assertActive(generation);
-          const metadataPlan = file.metadataFile
-            ? await github.prepareFileWrite(settings.repository, file.metadataFile.path, file.metadataFile.content, savedPending
-              ? { ownedSha: savedPending.metadataExpectedSha, targetExpectedAbsent: savedPending.metadataExpectedAbsent ?? true, allowPendingContentSha: savedPending.metadataContentSha }
-              : { ownedSha: priorMetadataPath === file.metadataFile.path ? priorMetadataSha : undefined, targetExpectedAbsent: priorMetadataPath !== file.metadataFile.path || !priorMetadataSha, adoptExactMatch: true })
-            : undefined;
-          await assertActive(generation);
-          sync.pendingWrite = {
-            problemKey: key, submissionId: submission.id, path: file.path, contentSha: sourcePlan.contentSha,
-            expectedSha: sourcePlan.sha, expectedAbsent: !sourcePlan.sha,
-            ...(metadataPlan ? { metadataPath: file.metadataFile!.path, metadataContentSha: metadataPlan.contentSha, metadataExpectedSha: metadataPlan.sha, metadataExpectedAbsent: !metadataPlan.sha } : {}),
-          };
-          if (!await saveSyncForJob(generation, sync)) throw new SyncCancelled();
-          await assertActive(generation);
-          const sourceSha = await github.commitFileWrite(sourcePlan, title);
-          // Persist the confirmed source-file ownership immediately. A disconnect,
-          // worker shutdown, or metadata-write failure after this point must not
-          // erase the only record that proves this file belongs to the extension.
-          await saveDurableOwnership(settings.repository.fullName, settings.codeforcesHandle, key, {
+
+        // Contest Protection Invariant: block upload if submission belongs to an active or unconfirmed contest
+        const contestId = submission.problem.contestId ?? submission.contestId ?? 0;
+        const contestCheck = await checkContestProtection(contestId, submission.creationTimeSeconds);
+        if (contestCheck.isProtected) {
+          sync.contestQueue[submission.id] = {
             submissionId: submission.id,
-            path: file.path,
-            sha: sourceSha,
-          });
-          await assertActive(generation);
-          const metadataSha = metadataPlan ? await github.commitFileWrite(metadataPlan, `${title} metadata`) : undefined;
-          await assertActive(generation);
-          if (prior && prior.path !== file.path && priorSha) sync.retiredFiles[prior.path] = priorSha;
-          if (priorMetadataPath && priorMetadataPath !== file.metadataFile?.path && priorMetadataSha) sync.retiredFiles[priorMetadataPath] = priorMetadataSha;
-          sync.synced[key] = { submissionId: submission.id, path: file.path, sha: sourceSha, ...(file.metadataFile && metadataSha ? { metadataPath: file.metadataFile.path, metadataSha } : {}) };
-          sync.pendingWrite = undefined;
-          delete sync.failed[key];
-          sync.uniqueProblems = Object.keys(sync.synced).length;
-          if (!sourcePlan.matchedExistingContent) sync.filesUploaded += 1;
-          sync.lastSubmissionId = Math.max(sync.lastSubmissionId, submission.id);
-          await saveDurableOwnership(settings.repository.fullName, settings.codeforcesHandle, key, sync.synced[key]);
-          await recordHistoryEntry({ ...historyBase, status: prior ? 'updated' : 'uploaded', recordedAt: Date.now(), filePath: file.path, ...(sourcePlan.matchedExistingContent ? { reason: 'Exact generated solution content already exists in this repository; it was verified and left unchanged.' } : {}) });
+            contestId,
+            problemIndex: submission.problem.index,
+            problemKey: key,
+            problemName: submission.problem.name,
+            programmingLanguage: submission.programmingLanguage,
+            submittedAt: submission.creationTimeSeconds * 1000,
+            verdict: submission.verdict || 'OK',
+            queuedAt: Date.now(),
+            reason: contestCheck.reason || 'Contest is active. Upload deferred until contest finishes.',
+            submission,
+          };
+          await recordHistoryEntry({ ...historyBase, status: 'skipped', recordedAt: Date.now(), filePath: prior?.path, reason: contestCheck.reason || 'Contest is active. Upload deferred.' });
           if (!await saveSyncForJob(generation, sync)) throw new SyncCancelled();
-          await cleanupRetiredFiles(github, settings.repository, sync, generation);
-        } catch (error) {
-          if (error instanceof SyncCancelled) throw error;
-          await assertActive(generation);
-          const reason = error instanceof Error ? error.message : 'GitHub write failed for this solution.';
-          sync.failed[key] = `${submission.id}|${reason}`;
-          await recordHistoryEntry({ ...historyBase, status: 'failed', recordedAt: Date.now(), filePath: file.path, reason });
-          if (!await saveSyncForJob(generation, sync)) throw new SyncCancelled();
-          if (!(error instanceof FileOwnershipError)) throw error;
+          continue;
         }
+
+        await uploadSingleSubmission(submission, activeSettings, sync, github, generation);
       }
       await assertActive(generation);
       sync.submissionsSeen += relevant.length;
@@ -292,3 +225,204 @@ function historyEntry(repositoryFullName: string, submission: CfSubmission, key:
     submittedAt: submission.creationTimeSeconds * 1000,
   };
 }
+
+async function processContestQueue(
+  github: GithubClient,
+  settings: NonNullable<Awaited<ReturnType<typeof getSettings>>> & {
+    repository: NonNullable<Awaited<ReturnType<typeof getSettings>>['repository']>;
+    codeforcesHandle: string;
+  },
+  sync: SyncState,
+  generation: number,
+): Promise<void> {
+  const queueItems = Object.values(sync.contestQueue);
+  if (queueItems.length === 0) return;
+
+  for (const item of queueItems) {
+    await assertActive(generation);
+    await renewSyncLock();
+    const contestCheck = await checkContestProtection(item.contestId, item.submittedAt / 1000);
+    if (contestCheck.isProtected) {
+      if (contestCheck.reason && contestCheck.reason !== item.reason) {
+        sync.contestQueue[item.submissionId] = { ...item, reason: contestCheck.reason };
+        if (!await saveSyncForJob(generation, sync)) throw new SyncCancelled();
+      }
+      continue;
+    }
+
+    // Contest has finished! Process the deferred submission
+    if (item.submission) {
+      try {
+        await uploadSingleSubmission(item.submission, settings, sync, github, generation);
+        delete sync.contestQueue[item.submissionId];
+        if (!await saveSyncForJob(generation, sync)) throw new SyncCancelled();
+      } catch (error) {
+        if (error instanceof SyncCancelled) throw error;
+        const reason = error instanceof Error ? error.message : 'Deferred submission upload failed.';
+        sync.failed[String(item.submissionId)] = `${item.submissionId}|${reason}`;
+        delete sync.contestQueue[item.submissionId];
+        if (!await saveSyncForJob(generation, sync)) throw new SyncCancelled();
+      }
+    } else {
+      delete sync.contestQueue[item.submissionId];
+      if (!await saveSyncForJob(generation, sync)) throw new SyncCancelled();
+    }
+  }
+}
+
+export function countUniqueProblems(synced: Record<string, SyncedFile>): number {
+  const problems = new Set<string>();
+  for (const [key, file] of Object.entries(synced)) {
+    if (file.problemKey) {
+      problems.add(file.problemKey);
+    } else if (/^\d+-[A-Za-z0-9]+$/.test(key)) {
+      problems.add(key);
+    } else {
+      const parts = file.path.split('/');
+      if (parts.length >= 4) {
+        problems.add(parts[2]);
+      } else if (parts.length === 3) {
+        problems.add(`${parts[1]}_${parts[2].replace(/\.[^.]+$/, '')}`);
+      } else {
+        problems.add(key);
+      }
+    }
+  }
+  return problems.size;
+}
+
+async function uploadSingleSubmission(
+  submission: CfSubmission,
+  settings: NonNullable<Awaited<ReturnType<typeof getSettings>>> & {
+    repository: NonNullable<Awaited<ReturnType<typeof getSettings>>['repository']>;
+    codeforcesHandle: string;
+  },
+  sync: SyncState,
+  github: GithubClient,
+  generation: number,
+): Promise<void> {
+  const subKey = String(submission.id);
+  const key = problemKey(submission.problem);
+  const prior = sync.synced[subKey] || Object.values(sync.synced).find((s) => s.submissionId === submission.id);
+  const historyBase = historyEntry(settings.repository.fullName, submission, key);
+
+  const excluded = filterReason(submission, settings.syncFilters);
+  if (excluded) {
+    await recordHistoryEntry({ ...historyBase, status: 'skipped', recordedAt: Date.now(), filePath: prior?.path, reason: `${excluded}${prior ? ' Existing synchronized file was retained.' : ''}` });
+    delete sync.contestQueue[submission.id];
+    return;
+  }
+
+  if (prior && prior.submissionId === submission.id) {
+    try {
+      await github.verifyOwnedFile(settings.repository, prior.path, prior.sha);
+      await assertActive(generation);
+      if (prior.metadataPath) {
+        await github.verifyOwnedFile(settings.repository, prior.metadataPath, prior.metadataSha);
+        await assertActive(generation);
+      }
+      await recordHistoryEntry({ ...historyBase, status: 'uploaded', recordedAt: Date.now(), filePath: prior.path, reason: 'Already synchronized; the recorded GitHub ownership SHA still matches.' });
+      delete sync.contestQueue[submission.id];
+    } catch (error) {
+      if (error instanceof SyncCancelled) throw error;
+      const reason = error instanceof Error ? error.message : 'Could not verify the tracked GitHub file.';
+      sync.failed[subKey] = `${submission.id}|${reason}`;
+      await recordHistoryEntry({ ...historyBase, status: 'failed', recordedAt: Date.now(), filePath: prior.path, reason });
+      delete sync.contestQueue[submission.id];
+      if (!await saveSyncForJob(generation, sync)) throw new SyncCancelled();
+      if (!(error instanceof FileOwnershipError)) throw error;
+    }
+    return;
+  }
+
+  const source = submissionSource(submission);
+  if (typeof source !== 'string' || source.length === 0) {
+    const reason = 'Codeforces did not return source for this Accepted submission.';
+    sync.failed[subKey] = `${submission.id}|${reason}`;
+    await recordHistoryEntry({ ...historyBase, status: 'failed', recordedAt: Date.now(), filePath: prior?.path, reason });
+    delete sync.contestQueue[submission.id];
+    if (!await saveSyncForJob(generation, sync)) throw new SyncCancelled();
+    return;
+  }
+
+  const currentSettings = await getSettings();
+  if (currentSettings.jobGeneration !== generation) throw new SyncCancelled();
+  if (currentSettings.codeforcesSourceAccess !== 'confirmed') {
+    await updateSettings((current) => current.jobGeneration === generation ? { ...current, codeforcesSourceAccess: 'confirmed' } : current);
+    await assertActive(generation);
+  }
+
+  const file = solutionContent(submission, source);
+  const content = `${file.content}${file.content.endsWith('\n') ? '' : '\n'}`;
+  const title = `Sync Codeforces ${submission.problem.contestId}${submission.problem.index}: ${submission.problem.name} (#${submission.id})`;
+  const savedPending = sync.pendingWrite?.submissionId === submission.id && sync.pendingWrite.path === file.path ? sync.pendingWrite : undefined;
+  const priorSha = prior?.sha;
+  const priorMetadataPath = prior?.metadataPath ?? (prior && !prior.sha ? `${prior.path}.metadata.json` : undefined);
+  const priorMetadataSha = prior?.metadataSha;
+
+  try {
+    const sourcePlan = await github.prepareFileWrite(settings.repository, file.path, content, savedPending
+      ? { ownedSha: savedPending.expectedSha, targetExpectedAbsent: savedPending.expectedAbsent, allowPendingContentSha: savedPending.contentSha }
+      : { ownedSha: prior?.path === file.path ? priorSha : undefined, targetExpectedAbsent: prior?.path !== file.path || !priorSha, adoptExactMatch: true });
+    await assertActive(generation);
+    const metadataPlan = file.metadataFile
+      ? await github.prepareFileWrite(settings.repository, file.metadataFile.path, file.metadataFile.content, savedPending
+        ? { ownedSha: savedPending.metadataExpectedSha, targetExpectedAbsent: savedPending.metadataExpectedAbsent ?? true, allowPendingContentSha: savedPending.metadataContentSha }
+        : { ownedSha: priorMetadataPath === file.metadataFile.path ? priorMetadataSha : undefined, targetExpectedAbsent: priorMetadataPath !== file.metadataFile.path || !priorMetadataSha, adoptExactMatch: true })
+      : undefined;
+    await assertActive(generation);
+    sync.pendingWrite = {
+      problemKey: key, submissionId: submission.id, path: file.path, contentSha: sourcePlan.contentSha,
+      expectedSha: sourcePlan.sha, expectedAbsent: !sourcePlan.sha,
+      ...(metadataPlan ? { metadataPath: file.metadataFile!.path, metadataContentSha: metadataPlan.contentSha, metadataExpectedSha: metadataPlan.sha, metadataExpectedAbsent: !metadataPlan.sha } : {}),
+    };
+    if (!await saveSyncForJob(generation, sync)) throw new SyncCancelled();
+    await assertActive(generation);
+    const sourceSha = await github.commitFileWrite(sourcePlan, title);
+    // Persist confirmed source ownership immediately under submission ID
+    await saveDurableOwnership(settings.repository.fullName, settings.codeforcesHandle, subKey, {
+      submissionId: submission.id,
+      path: file.path,
+      sha: sourceSha,
+      problemKey: key,
+    });
+    await assertActive(generation);
+    const metadataSha = metadataPlan ? await github.commitFileWrite(metadataPlan, `${title} metadata`) : undefined;
+    await assertActive(generation);
+
+    const syncedEntry: SyncedFile = {
+      submissionId: submission.id,
+      path: file.path,
+      sha: sourceSha,
+      problemKey: key,
+      ...(file.metadataFile && metadataSha ? { metadataPath: file.metadataFile.path, metadataSha } : {}),
+    };
+    sync.synced[subKey] = syncedEntry;
+    sync.pendingWrite = undefined;
+    delete sync.failed[subKey];
+    delete sync.contestQueue[submission.id];
+    sync.uniqueProblems = countUniqueProblems(sync.synced);
+    if (!sourcePlan.matchedExistingContent) sync.filesUploaded += 1;
+    sync.lastSubmissionId = Math.max(sync.lastSubmissionId, submission.id);
+    await saveDurableOwnership(settings.repository.fullName, settings.codeforcesHandle, subKey, syncedEntry);
+    await recordHistoryEntry({
+      ...historyBase,
+      status: 'uploaded',
+      recordedAt: Date.now(),
+      filePath: file.path,
+      ...(sourcePlan.matchedExistingContent ? { reason: 'Exact generated solution content already exists in this repository; it was verified and left unchanged.' } : {}),
+    });
+    if (!await saveSyncForJob(generation, sync)) throw new SyncCancelled();
+    await cleanupRetiredFiles(github, settings.repository, sync, generation);
+  } catch (error) {
+    if (error instanceof SyncCancelled) throw error;
+    await assertActive(generation);
+    const reason = error instanceof Error ? error.message : 'GitHub write failed for this solution.';
+    sync.failed[subKey] = `${submission.id}|${reason}`;
+    await recordHistoryEntry({ ...historyBase, status: 'failed', recordedAt: Date.now(), filePath: file.path, reason });
+    delete sync.contestQueue[submission.id];
+    if (!await saveSyncForJob(generation, sync)) throw new SyncCancelled();
+    if (!(error instanceof FileOwnershipError)) throw error;
+  }
+}
+
