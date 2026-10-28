@@ -69,7 +69,7 @@
 | :--- | :--- | :--- |
 | **Google Chrome** | 🟢 Manual (ZIP) | [Download Latest Release ZIP](https://github.com/F0RREALTHO/codeforces-github-sync/releases/latest) *(Chrome Web Store coming Dec 2026)* |
 | **Brave Browser** | 🟢 Supported | Load unpacked release via `brave://extensions` |
-| **Mozilla Firefox** | 🟡 In Review | Firefox AMO listing awaiting final review |
+| **Mozilla Firefox** | 🟢 Approved | Official Firefox Add-on listing approved on AMO |
 | **Microsoft Edge** | 🟡 In Review | Microsoft Edge Add-ons listing in review |
 
 > [!NOTE]
