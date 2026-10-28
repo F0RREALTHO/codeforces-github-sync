@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "CommitForce",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "minimum_chrome_version": "120",
   "description": "Contest-safe, automated Codeforces solution sync to GitHub with dynamic streak tracking and encrypted vault.",
   "icons": {

@@ -1,9 +1,21 @@
 param(
-  [string]$OutputPath
+  [string]$OutputPath,
+  [switch]$Force = $false
 )
 
 $ErrorActionPreference = 'Stop'
 $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+
+function Get-RelativePath([string]$BaseDirectory, [string]$Path) {
+  $base = [IO.Path]::GetFullPath($BaseDirectory).TrimEnd('\', '/') + '\'
+  $full = [IO.Path]::GetFullPath($Path)
+  if ($full.StartsWith($base, [StringComparison]::OrdinalIgnoreCase)) {
+    return $full.Substring($base.Length).Replace('\', '/')
+  }
+  $baseUri = [Uri]$base
+  $targetUri = [Uri]$full
+  return [Uri]::UnescapeDataString($baseUri.MakeRelativeUri($targetUri).ToString()).Replace('\', '/')
+}
 $distRoot = Join-Path $projectRoot 'dist'
 $manifestPath = Join-Path $distRoot 'manifest.json'
 $packagePath = Join-Path $projectRoot 'package.json'
@@ -93,18 +105,25 @@ if (-not $OutputPath) {
 $outputDirectory = Split-Path -Parent $OutputPath
 if (-not (Test-Path -LiteralPath $outputDirectory)) { New-Item -ItemType Directory -Path $outputDirectory -Force | Out-Null }
 $OutputPath = [IO.Path]::GetFullPath($OutputPath)
-if (Test-Path -LiteralPath $OutputPath) { throw "Refusing to overwrite existing archive: $OutputPath" }
+if (Test-Path -LiteralPath $OutputPath) {
+  if ($Force) {
+    Remove-Item -LiteralPath $OutputPath -Force
+  } else {
+    throw "Refusing to overwrite existing archive: $OutputPath. Pass -Force to overwrite."
+  }
+}
 
 $files = Get-ChildItem -LiteralPath $distRoot -Recurse -File | Where-Object {
   $_.FullName -notmatch '[\\/]store-assets[\\/]' -and $_.Extension -ne '.map'
-} | Sort-Object { [IO.Path]::GetRelativePath($distRoot, $_.FullName).Replace('\', '/') }
+} | Sort-Object { (Get-RelativePath $distRoot $_.FullName).Replace('\', '/') }
 
 Add-Type -AssemblyName System.IO.Compression
+Add-Type -AssemblyName System.IO.Compression.FileSystem
 $outputStream = [IO.File]::Open($OutputPath, [IO.FileMode]::CreateNew, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
 $archive = [IO.Compression.ZipArchive]::new($outputStream, [IO.Compression.ZipArchiveMode]::Create, $false)
 try {
   foreach ($file in $files) {
-    $entryName = [IO.Path]::GetRelativePath($distRoot, $file.FullName).Replace('\', '/')
+    $entryName = (Get-RelativePath $distRoot $file.FullName).Replace('\', '/')
     $entry = $archive.CreateEntry($entryName, [IO.Compression.CompressionLevel]::Optimal)
     $entry.LastWriteTime = [DateTimeOffset]::new(2000, 1, 1, 0, 0, 0, [TimeSpan]::Zero)
     $inputStream = [IO.File]::OpenRead($file.FullName)
@@ -129,7 +148,7 @@ try {
   }
   if ($names -match '^store-assets/') { throw 'Archive should not include non-runtime store assets.' }
   $unexpected = @($names | Where-Object {
-    $_ -notmatch '^(manifest\.json|index\.html|dashboard\.html|privacy\.html|background\.js|assets/[A-Za-z0-9._-]+\.(js|css)|icons/icon(16|32|48|128)\.png)$'
+    $_ -notmatch '^(manifest\.json|index\.html|dashboard\.html|privacy\.html|background\.js|assets/[A-Za-z0-9._-]+\.(js|css|woff2?)|icons/icon(16|32|48|128)\.png)$'
   })
   if ($unexpected.Count -gt 0) { throw 'Archive contains files outside the approved runtime allowlist.' }
 } finally {

@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/F0RREALTHO/codeforces-github-sync/releases/latest"><img src="https://img.shields.io/badge/Release-v0.2.0-2563EB?style=for-the-badge&logo=github" alt="Release v0.2.0" /></a>
+  <a href="https://github.com/F0RREALTHO/codeforces-github-sync/releases/latest"><img src="https://img.shields.io/badge/Release-v0.3.0-2563EB?style=for-the-badge&logo=github" alt="Release v0.3.0" /></a>
   <a href="https://github.com/F0RREALTHO/codeforces-github-sync/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/F0RREALTHO/codeforces-github-sync/ci.yml?branch=main&style=for-the-badge&label=CI&logo=githubactions&logoColor=white" alt="CI Status" /></a>
   <a href="https://github.com/F0RREALTHO/codeforces-github-sync/actions"><img src="https://img.shields.io/badge/Tests-138%20Passing-10B981?style=for-the-badge&logo=vitest&logoColor=white" alt="138 Tests Passing" /></a>
   <img src="https://img.shields.io/badge/PBKDF2-600k%20Iterations-8B5CF6?style=for-the-badge&logo=security" alt="Vault Security" />
