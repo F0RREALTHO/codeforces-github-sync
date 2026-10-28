@@ -30,6 +30,10 @@ import {
   IconPlay,
   IconRefreshCw,
 } from '../components/Icons';
+import "@fontsource/space-grotesk/latin-500.css";
+import "@fontsource/space-grotesk/latin-700.css";
+import "@fontsource/jetbrains-mono/latin-400.css";
+import "@fontsource/jetbrains-mono/latin-500.css";
 import './styles.css';
 
 type DashboardState = Settings & { vault: VaultStatus };
@@ -1342,7 +1346,7 @@ function Dashboard() {
                             href={`https://codeforces.com/contest/${sub.contestId}/submission/${sub.submissionId}`}
                             target="_blank"
                             rel="noreferrer"
-                            className="link tabular"
+                            className="link tabular submission-id"
                             style={{ fontWeight: 600 }}
                           >
                             Submission {sub.submissionId} ↗
@@ -1366,7 +1370,7 @@ function Dashboard() {
                           {sub.filePath && (
                             <>
                               <span>—</span>
-                              <code style={{ fontSize: 10, color: 'var(--text-muted)' }}>{sub.filePath}</code>
+                              <code className="file-path" style={{ fontSize: 11, color: 'var(--text-muted)' }}>{sub.filePath}</code>
                             </>
                           )}
                         </div>

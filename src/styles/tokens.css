@@ -1,8 +1,10 @@
-/* Codeforces → GitHub Sync Design System Tokens */
+/* CommitForce Design System Tokens */
 :root {
   /* Font Stacks */
-  --font-sans: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  --font-display: "Space Grotesk", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+  --font-body: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 
   /* Typography Scale */
   --text-xs: 0.6875rem;   /* 11px */
@@ -198,4 +200,24 @@ body {
 [data-tabular] {
   font-variant-numeric: tabular-nums;
   font-family: var(--font-mono);
+}
+
+/* Base Typography Pairings */
+body {
+  font-family: var(--font-body);
+}
+
+h1, h2, h3, h4, .stat-value, .stat-box-val, .metric-value, .hero-streak-num, .popup-title, .dash-title {
+  font-family: var(--font-display);
+  letter-spacing: -0.01em;
+}
+
+.eyebrow, .label, .pill, .badge, .submission-id, .sub-id, .file-path, .cf-status-label, code, pre, kbd {
+  font-family: var(--font-mono);
+}
+
+.eyebrow, .label {
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }

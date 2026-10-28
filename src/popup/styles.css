@@ -54,9 +54,10 @@ body {
 
 .popup-title {
   margin: 0;
+  font-family: var(--font-display);
   font-size: var(--text-md);
-  font-weight: 600;
-  letter-spacing: -0.2px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
   color: var(--text-primary);
   line-height: 1.2;
 }
@@ -283,15 +284,19 @@ body {
 }
 
 .metric-value {
-  font-family: var(--font-mono);
+  font-family: var(--font-display);
   font-size: var(--text-lg);
-  font-weight: 600;
+  font-weight: 700;
   color: var(--text-primary);
   line-height: 1.2;
+  letter-spacing: -0.01em;
 }
 
 .metric-label {
-  font-size: var(--text-xs);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
   color: var(--text-secondary);
   margin-top: 2px;
 }
@@ -402,10 +407,11 @@ body {
 }
 
 .section-title {
-  font-size: var(--text-xs);
+  font-family: var(--font-mono);
+  font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.12em;
   color: var(--text-secondary);
 }
 

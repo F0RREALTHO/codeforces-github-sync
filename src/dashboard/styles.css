@@ -60,10 +60,11 @@ body {
 
 .dash-title {
   margin: 0;
+  font-family: var(--font-display);
   font-size: var(--text-lg);
-  font-weight: 600;
+  font-weight: 700;
   color: var(--text-primary);
-  letter-spacing: -0.3px;
+  letter-spacing: -0.01em;
   line-height: 1.2;
 }
 
@@ -189,16 +190,20 @@ body {
 }
 
 .stat-box-title {
-  font-size: var(--text-xs);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
   color: var(--text-secondary);
-  font-weight: 500;
+  font-weight: 600;
   margin: 0;
 }
 
 .stat-box-val {
-  font-family: var(--font-mono);
+  font-family: var(--font-display);
   font-size: var(--text-xl);
-  font-weight: 600;
+  font-weight: 700;
+  letter-spacing: -0.01em;
   color: var(--text-primary);
   line-height: 1.1;
   margin: 0;
@@ -246,10 +251,11 @@ body {
 
 .panel-title {
   margin: 0;
+  font-family: var(--font-display);
   font-size: var(--text-md);
-  font-weight: 600;
+  font-weight: 700;
   color: var(--text-primary);
-  letter-spacing: -0.2px;
+  letter-spacing: -0.01em;
 }
 
 .panel-desc {
@@ -777,17 +783,22 @@ a.link:hover {
 }
 
 .streak-hero-days {
-  font-size: 2rem;
+  font-family: var(--font-display);
+  font-size: 2.25rem;
   font-weight: 700;
   line-height: 1.1;
   color: var(--text-primary);
+  letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
 }
 
 .streak-hero-label {
-  font-size: var(--text-sm);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
   color: var(--text-secondary);
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .streak-hero-breakdown {

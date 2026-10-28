@@ -20,6 +20,10 @@ import {
   IconAlert,
   IconCheck,
 } from '../components/Icons';
+import "@fontsource/space-grotesk/latin-500.css";
+import "@fontsource/space-grotesk/latin-700.css";
+import "@fontsource/jetbrains-mono/latin-400.css";
+import "@fontsource/jetbrains-mono/latin-500.css";
 import './styles.css';
 
 const authApi = import.meta.env.VITE_AUTH_API_BASE_URL as string | undefined;
