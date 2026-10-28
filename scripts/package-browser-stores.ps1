@@ -100,7 +100,7 @@ foreach ($build in $builds) {
   $results.Add([pscustomobject]@{ Root = $root; Files = $files; Manifest = $manifest; Archive = $archivePath; Name = $build.Name })
 }
 
-$sourcePaths = @('README.md', 'CHANGELOG.md', '.gitignore', '.env.example', '.env.test.example', 'package.json', 'package-lock.json', 'index.html', 'dashboard.html', 'vite.config.ts', 'vitest.config.ts', 'tsconfig.json', 'tsconfig.app.json', 'tsconfig.node.json', 'docs', 'src', 'public', 'backend', 'scripts')
+$sourcePaths = @('README.md', '.gitignore', '.env.example', '.env.test.example', 'package.json', 'package-lock.json', 'index.html', 'dashboard.html', 'vite.config.ts', 'vitest.config.ts', 'tsconfig.json', 'tsconfig.app.json', 'tsconfig.node.json', 'docs', 'src', 'public', 'backend', 'scripts')
 $sourceFiles = [Collections.Generic.List[string]]::new()
 foreach ($path in $sourcePaths) {
   $absolute = Join-Path $projectRoot $path
