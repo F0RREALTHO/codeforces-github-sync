@@ -79,17 +79,17 @@
 
 ---
 
-## ✨ Key Features
+## Key Features
 
-* 📁 **Preserve Every Accepted Solution:** Deduplication is strictly by **Codeforces Submission ID**, not problem identity. If you solve a problem with a brute-force approach and later write an optimized version or rewrite it in Python or Rust, **all Accepted solutions are preserved independently** under clean problem folders.
-* 🔥 **Dynamic Streak Fire Engine:** Accurately calculates your Codeforces solving streaks directly from your full profile activity history:
+* **Preserve Every Accepted Solution:** Deduplication is strictly by **Codeforces Submission ID**, not problem identity. If you solve a problem with a brute-force approach and later write an optimized version or rewrite it in Python or Rust, **all Accepted solutions are preserved independently** under clean problem folders.
+* **Dynamic Streak Fire Engine:** Accurately calculates your Codeforces solving streaks directly from your full profile activity history:
   - Tracks **Current Streak**, **All-time Record**, **Best Last 365 Days**, and **Best Last 30 Days**.
   - Animated flame icon with 6 reactive intensity tiers (Cold Start → Kindling Ember → Steady Flame → Blazing Torch → Roaring Inferno → Legendary Plasma) that dynamically evolve as your streak climbs.
-* 🛡️ **Contest-Aware Upload Protection:** Invariant sync guard that detects active or ongoing Codeforces contest participation. During live contests, newly submitted solutions are automatically held in an encrypted local staging queue and synced only after the round concludes—eliminating any risk of accidental code leaks or plagiarism disqualification.
-* 🔒 **Zero Secret Leakage Vault:** No plain-text storage and no broad GitHub Personal Access Tokens (PATs). Credentials and OAuth tokens are secured using client-side **PBKDF2-SHA256 (600,000 iterations)** and **AES-GCM-256** encryption.
-* 🔍 **Git-Blob Conflict Protection:** Uses Git SHA-1 hashing to verify exact code matching before writing. It never overwrites your existing custom files or creates duplicate commits.
-* 🎯 **Granular Sync Filtering:** Filter which solutions sync based on tags, rating thresholds (e.g. 800 to 3500), language selection, or contest IDs directly from the dashboard.
-* 🔄 **Resilient Sync Engine:** Handles Codeforces pagination offsets, GitHub API rate limits with exponential backoff & jitter, and network reconnections gracefully.
+* **Contest-Aware Upload Protection:** Invariant sync guard that detects active or ongoing Codeforces contest participation. During live contests, newly submitted solutions are automatically held in an encrypted local staging queue and synced only after the round concludes—stopping accidental code leaks or plagiarism disqualification.
+* **Zero Secret Leakage Vault:** No plain-text storage and no broad GitHub Personal Access Tokens (PATs). Credentials and OAuth tokens are secured using client-side **PBKDF2-SHA256 (600,000 iterations)** and **AES-GCM-256** encryption.
+* **Git-Blob Conflict Protection:** Uses Git SHA-1 hashing to verify exact code matching before writing. It never overwrites your existing custom files or creates duplicate commits.
+* **Granular Sync Filtering:** Filter which solutions sync based on tags, rating thresholds (e.g. 800 to 3500), language selection, or contest IDs directly from the dashboard.
+* **Resilient Sync Engine:** Handles Codeforces pagination offsets, GitHub API rate limits with exponential backoff & jitter, and network reconnections gracefully.
 
 ---
 
