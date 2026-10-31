@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { browserApi, hasExtensionRuntime, sendRuntimeMessage } from '../platform/browser';
 import { calculateStreaks, getBrowserTimezone, type StreakResult } from '../domain/streaks';
@@ -38,14 +38,58 @@ async function send<T>(message: Message): Promise<T> {
   return sendRuntimeMessage<T>(message);
 }
 
+const DRAFT_KEY = 'cfgh.cfConnectDraft';
+
+interface CfConnectDraft {
+  handle: string;
+  apiKey: string;
+  apiSecret: string;
+  open: boolean;
+}
+
+/** Persist partial Codeforces credential form state across popup close/reopen cycles. */
+function useCfConnectDraft() {
+  const [draft, setDraftState] = useState<CfConnectDraft>({ handle: '', apiKey: '', apiSecret: '', open: false });
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    if (!hasExtensionRuntime()) { setLoaded(true); return; }
+    browserApi().storage.session.get(DRAFT_KEY).then((result) => {
+      if (result[DRAFT_KEY]) setDraftState(result[DRAFT_KEY] as CfConnectDraft);
+      setLoaded(true);
+    }).catch(() => setLoaded(true));
+  }, []);
+
+  const setDraft = useCallback((updater: CfConnectDraft | ((prev: CfConnectDraft) => CfConnectDraft)) => {
+    setDraftState((prev) => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      if (hasExtensionRuntime()) browserApi().storage.session.set({ [DRAFT_KEY]: next }).catch(() => undefined);
+      return next;
+    });
+  }, []);
+
+  const clearDraft = useCallback(() => {
+    const empty: CfConnectDraft = { handle: '', apiKey: '', apiSecret: '', open: false };
+    setDraftState(empty);
+    if (hasExtensionRuntime()) browserApi().storage.session.remove(DRAFT_KEY).catch(() => undefined);
+  }, []);
+
+  return { draft, setDraft, clearDraft, loaded };
+}
+
 function App() {
   const [settings, setSettings] = useState<UiSettings | null>(null);
   const [repositories, setRepositories] = useState<GithubRepository[]>([]);
   const [repoPickerOpen, setRepoPickerOpen] = useState(false);
-  const [handle, setHandle] = useState('');
-  const [cfApiKey, setCfApiKey] = useState('');
-  const [cfApiSecret, setCfApiSecret] = useState('');
-  const [cfConnectOpen, setCfConnectOpen] = useState(false);
+  const { draft: cfDraft, setDraft: setCfDraft, clearDraft: clearCfDraft } = useCfConnectDraft();
+  const handle = cfDraft.handle;
+  const cfApiKey = cfDraft.apiKey;
+  const cfApiSecret = cfDraft.apiSecret;
+  const cfConnectOpen = cfDraft.open;
+  const setHandle = (v: string) => setCfDraft((d) => ({ ...d, handle: v }));
+  const setCfApiKey = (v: string) => setCfDraft((d) => ({ ...d, apiKey: v }));
+  const setCfApiSecret = (v: string) => setCfDraft((d) => ({ ...d, apiSecret: v }));
+  const setCfConnectOpen = (v: boolean | ((prev: boolean) => boolean)) => setCfDraft((d) => ({ ...d, open: typeof v === 'function' ? v(d.open) : v }));
   const [vaultPassphrase, setVaultPassphrase] = useState('');
   const [newRepo, setNewRepo] = useState('competitive-programming');
   const [privateRepo, setPrivateRepo] = useState(false);
@@ -687,9 +731,7 @@ function App() {
                         'Codeforces connected.',
                         { type: 'connectCodeforces', handle, apiKey: cfApiKey, apiSecret: cfApiSecret },
                         () => {
-                          setCfApiSecret('');
-                          setCfApiKey('');
-                          setCfConnectOpen(false);
+                          clearCfDraft();
                         }
                       )
                     }
